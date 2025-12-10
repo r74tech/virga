@@ -1,0 +1,430 @@
+{
+  "name": "powerview",
+  "type": "powershell",
+  "description": "PowerView is a PowerShell tool for Active Directory reconnaissance and enumeration. It provides numerous cmdlets for discovering domain information, users, groups, computers, and more.",
+  "commands": [
+    {
+      "name": "Get-NetDomain",
+      "description": "Returns the current domain or information about a specified domain",
+      "parameters": [],
+      "examples": [
+        {
+          "command": "Get-NetDomain",
+          "description": "Get information about the current domain"
+        }
+      ]
+    },
+    {
+      "name": "Get-NetUser",
+      "description": "Returns user objects from Active Directory with various filtering options",
+      "parameters": [
+        {
+          "name": "Identity",
+          "type": "string",
+          "required": false,
+          "description": "Specific user identity to query (username, SID, or DN)"
+        },
+        {
+          "name": "AdminCount",
+          "type": "switch",
+          "required": false,
+          "description": "Filter for users with adminCount=1 (privileged accounts)"
+        },
+        {
+          "name": "SPN",
+          "type": "switch",
+          "required": false,
+          "description": "Filter for users with Service Principal Names (Kerberoastable)"
+        }
+      ],
+      "examples": [
+        {
+          "command": "Get-NetUser",
+          "description": "Get all domain users"
+        }
+      ]
+    },
+    {
+      "name": "Get-NetGroup",
+      "description": "Returns group objects from Active Directory",
+      "parameters": [
+        {
+          "name": "Identity",
+          "type": "string",
+          "required": false,
+          "description": "Specific group identity to query"
+        },
+        {
+          "name": "AdminCount",
+          "type": "switch",
+          "required": false,
+          "description": "Filter for groups with adminCount=1"
+        }
+      ],
+      "examples": [
+        {
+          "command": "Get-NetGroup",
+          "description": "Get all domain groups"
+        }
+      ]
+    },
+    {
+      "name": "Get-NetGroupMember",
+      "description": "Returns members of a specific domain group",
+      "parameters": [
+        {
+          "name": "Identity",
+          "type": "string",
+          "required": true,
+          "description": "Group identity to enumerate members"
+        },
+        {
+          "name": "Recurse",
+          "type": "switch",
+          "required": false,
+          "description": "Recursively enumerate nested group members"
+        }
+      ],
+      "examples": [
+        {
+          "command": "Get-NetGroupMember -Identity 'Domain Admins'",
+          "description": "Get members of Domain Admins group"
+        }
+      ]
+    },
+    {
+      "name": "Get-NetComputer",
+      "description": "Returns computer objects from Active Directory",
+      "parameters": [
+        {
+          "name": "Identity",
+          "type": "string",
+          "required": false,
+          "description": "Specific computer identity to query"
+        },
+        {
+          "name": "OperatingSystem",
+          "type": "string",
+          "required": false,
+          "description": "Filter by operating system name"
+        },
+        {
+          "name": "Ping",
+          "type": "switch",
+          "required": false,
+          "description": "Only return computers that respond to ping"
+        }
+      ],
+      "examples": [
+        {
+          "command": "Get-NetComputer",
+          "description": "Get all domain computers"
+        }
+      ]
+    },
+    {
+      "name": "Get-NetSession",
+      "description": "Returns active sessions on a target computer",
+      "parameters": [
+        {
+          "name": "ComputerName",
+          "type": "string",
+          "required": false,
+          "description": "Target computer to query (defaults to localhost)"
+        }
+      ],
+      "examples": [
+        {
+          "command": "Get-NetSession",
+          "description": "Get sessions on the local computer"
+        }
+      ]
+    },
+    {
+      "name": "Get-NetLoggedon",
+      "description": "Returns logged on users on a target computer",
+      "parameters": [
+        {
+          "name": "ComputerName",
+          "type": "string",
+          "required": false,
+          "description": "Target computer to query"
+        }
+      ],
+      "examples": [
+        {
+          "command": "Get-NetLoggedon",
+          "description": "Get users logged on to local computer"
+        }
+      ]
+    },
+    {
+      "name": "Get-NetShare",
+      "description": "Returns shared folders on a target computer",
+      "parameters": [
+        {
+          "name": "ComputerName",
+          "type": "string",
+          "required": false,
+          "description": "Target computer to query"
+        }
+      ],
+      "examples": [
+        {
+          "command": "Get-NetShare",
+          "description": "Get shares on local computer"
+        }
+      ]
+    },
+    {
+      "name": "Find-DomainShare",
+      "description": "Finds accessible shares across the domain",
+      "parameters": [
+        {
+          "name": "CheckShareAccess",
+          "type": "switch",
+          "required": false,
+          "description": "Only return shares the current user can access"
+        }
+      ],
+      "examples": [
+        {
+          "command": "Find-DomainShare",
+          "description": "Find all domain shares"
+        }
+      ]
+    },
+    {
+      "name": "Get-DomainGPO",
+      "description": "Returns Group Policy Objects in the domain",
+      "parameters": [
+        {
+          "name": "Identity",
+          "type": "string",
+          "required": false,
+          "description": "Specific GPO identity to query"
+        }
+      ],
+      "examples": [
+        {
+          "command": "Get-DomainGPO",
+          "description": "Get all domain GPOs"
+        }
+      ]
+    },
+    {
+      "name": "Get-DomainOU",
+      "description": "Returns Organizational Units in the domain",
+      "parameters": [
+        {
+          "name": "Identity",
+          "type": "string",
+          "required": false,
+          "description": "Specific OU identity to query"
+        }
+      ],
+      "examples": [
+        {
+          "command": "Get-DomainOU",
+          "description": "Get all domain OUs"
+        }
+      ]
+    },
+    {
+      "name": "Find-LocalAdminAccess",
+      "description": "Finds computers where the current user has local admin access",
+      "parameters": [],
+      "examples": [
+        {
+          "command": "Find-LocalAdminAccess",
+          "description": "Find all computers where current user is local admin"
+        }
+      ]
+    },
+    {
+      "name": "Invoke-UserHunter",
+      "description": "Finds where specified users are logged in across the domain",
+      "parameters": [
+        {
+          "name": "UserName",
+          "type": "string",
+          "required": false,
+          "description": "Specific username to hunt for"
+        },
+        {
+          "name": "AdminCount",
+          "type": "switch",
+          "required": false,
+          "description": "Hunt for privileged users only"
+        }
+      ],
+      "examples": [
+        {
+          "command": "Invoke-UserHunter",
+          "description": "Hunt for all domain users across computers"
+        }
+      ]
+    },
+    {
+      "name": "Invoke-Kerberoast",
+      "description": "Requests service tickets for Kerberoastable user accounts (users with SPNs) and extracts their password hashes for offline cracking",
+      "parameters": [
+        {
+          "name": "Identity",
+          "type": "string",
+          "required": false,
+          "description": "Specific user identity to Kerberoast"
+        },
+        {
+          "name": "OutputFormat",
+          "type": "string",
+          "required": false,
+          "description": "Output format for hashes: Hashcat, John (default: Hashcat)"
+        }
+      ],
+      "examples": [
+        {
+          "command": "Invoke-Kerberoast -OutputFormat Hashcat",
+          "description": "Extract Kerberoastable hashes in Hashcat format for all users with SPNs"
+        }
+      ]
+    },
+    {
+      "name": "Invoke-ACLScanner",
+      "description": "Scans for interesting ACL configurations in Active Directory (abusable permissions)",
+      "parameters": [
+        {
+          "name": "ResolveGUIDs",
+          "type": "switch",
+          "required": false,
+          "description": "Resolve GUIDs to their display names"
+        }
+      ],
+      "examples": [
+        {
+          "command": "Invoke-ACLScanner -ResolveGUIDs",
+          "description": "Scan for interesting ACLs with resolved GUID names"
+        }
+      ]
+    },
+    {
+      "name": "Get-DomainTrust",
+      "description": "Returns domain trusts for the current or specified domain",
+      "parameters": [
+        {
+          "name": "Domain",
+          "type": "string",
+          "required": false,
+          "description": "Specific domain to query for trusts"
+        }
+      ],
+      "examples": [
+        {
+          "command": "Get-DomainTrust",
+          "description": "Get all domain trusts for current domain"
+        }
+      ]
+    },
+    {
+      "name": "Get-DomainPolicy",
+      "description": "Returns the domain policy for the current or specified domain",
+      "parameters": [
+        {
+          "name": "Domain",
+          "type": "string",
+          "required": false,
+          "description": "Specific domain to query"
+        },
+        {
+          "name": "Source",
+          "type": "string",
+          "required": false,
+          "description": "Source to query (Domain, DC, or All)"
+        }
+      ],
+      "examples": [
+        {
+          "command": "Get-DomainPolicy",
+          "description": "Get the current domain policy"
+        }
+      ]
+    },
+    {
+      "name": "Get-NetFileServer",
+      "description": "Returns file servers in the domain by querying the domain for all users' HomeDirectory properties",
+      "parameters": [],
+      "examples": [
+        {
+          "command": "Get-NetFileServer",
+          "description": "Discover file servers in the domain"
+        }
+      ]
+    },
+    {
+      "name": "Find-InterestingDomainAcl",
+      "description": "Finds interesting ACLs on domain objects (similar to Invoke-ACLScanner but with different filtering)",
+      "parameters": [
+        {
+          "name": "ResolveGUIDs",
+          "type": "switch",
+          "required": false,
+          "description": "Resolve GUIDs to their display names"
+        }
+      ],
+      "examples": [
+        {
+          "command": "Find-InterestingDomainAcl -ResolveGUIDs",
+          "description": "Find interesting domain ACLs with resolved GUIDs"
+        }
+      ]
+    },
+    {
+      "name": "Add-DomainGroupMember",
+      "description": "Adds a user/computer to a domain group",
+      "parameters": [
+        {
+          "name": "Identity",
+          "type": "string",
+          "required": true,
+          "description": "Group identity to add member to"
+        },
+        {
+          "name": "Members",
+          "type": "string",
+          "required": true,
+          "description": "User/computer to add to the group"
+        }
+      ],
+      "examples": [
+        {
+          "command": "Add-DomainGroupMember -Identity 'Domain Admins' -Members 'backdoor_user'",
+          "description": "Add a user to Domain Admins group"
+        }
+      ]
+    },
+    {
+      "name": "Set-DomainObject",
+      "description": "Modifies a domain object's attributes",
+      "parameters": [
+        {
+          "name": "Identity",
+          "type": "string",
+          "required": true,
+          "description": "Object identity to modify"
+        },
+        {
+          "name": "Set",
+          "type": "hashtable",
+          "required": true,
+          "description": "Hashtable of attributes to set"
+        }
+      ],
+      "examples": [
+        {
+          "command": "Set-DomainObject -Identity user1 -Set @{serviceprincipalname='http/user1.domain.com'}",
+          "description": "Set SPN on a user for targeted Kerberoasting"
+        }
+      ]
+    }
+  ]
+}

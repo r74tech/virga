@@ -1,0 +1,30 @@
+appearance:
+    banner_enabled: true
+    color_enabled: true
+    default_prompt: "virga> "
+    session_info_style: compact
+    session_prompt: "virga (%s)> "
+    timestamp_format: "2006-01-02 15:04:05"
+general:
+    auto_completion: true
+    completion_sort_order: rank # "rank" or "alphabetical"
+    debug: false
+    default_listener: default-http
+    history_file: .virga_history
+    output_dir: outputs
+logging:
+    enabled: true
+    log_file: logs/cli.log
+    log_level: info
+    max_backup: 5
+    max_size: 10
+    jsonl_enabled: true
+    jsonl_file: "logs/virga-{datetime}.jsonl"
+    jsonl_level: "debug" # Record all logs in JSONL format
+server:
+    api_key: ""
+    host: 127.0.0.1
+    password: ""
+    port: 8443
+    use_ssl: false
+    username: ""

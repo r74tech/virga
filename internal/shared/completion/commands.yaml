@@ -1,0 +1,341 @@
+# Virga CLI Command Definitions
+# This file defines all commands, their subcommands, and completion rules
+# Location: internal/shared/completion/commands.yaml
+
+commands:
+  # Basic commands
+  help:
+    description: "Show help information"
+    priority: 100
+
+  exit:
+    description: "Exit the CLI"
+    aliases: ["quit"]
+    priority: 90
+
+  clear:
+    description: "Clear the screen"
+    aliases: ["cls"]
+    priority: 80
+
+  history:
+    description: "Show command history"
+    priority: 85
+    args:
+      - name: options
+        type: string
+        description: "Options: -n <count>, -d (details), -v (verbose)"
+        optional: true
+
+  # Session management
+  sessions:
+    description: "Manage sessions"
+    priority: 95
+    subcommands:
+      list:
+        description: "List all sessions"
+      kill:
+        description: "Kill a session"
+        args:
+          - name: session_id
+            type: session_id
+            description: "Session ID to kill"
+
+  interact:
+    description: "Interact with a session"
+    priority: 95
+    args:
+      - name: session_id
+        type: session_id
+        description: "Session ID to interact with"
+
+  # Beacon and listener management
+  beacons:
+    description: "Manage beacons"
+    priority: 70
+    subcommands:
+      list:
+        description: "List all beacons"
+      set-sleep:
+        description: "Set beacon sleep time"
+        args:
+          - name: seconds
+            type: number
+            description: "Sleep time in seconds"
+      set-jitter:
+        description: "Set beacon jitter"
+        args:
+          - name: percentage
+            type: number
+            description: "Jitter percentage"
+
+  listeners:
+    description: "Manage listeners"
+    priority: 70
+    subcommands:
+      list:
+        description: "List all listeners"
+      add:
+        description: "Add a new listener"
+      remove:
+        description: "Remove a listener"
+
+  # Generation
+  generate:
+    description: "Generate payloads"
+    priority: 75
+    subcommands:
+      exe:
+        description: "Generate Windows executable"
+      dll:
+        description: "Generate Windows DLL"
+      shellcode:
+        description: "Generate shellcode"
+      powershell:
+        description: "Generate PowerShell payload"
+
+  # File operations
+  upload:
+    description: "Upload a file"
+    priority: 85
+    args:
+      - name: local_path
+        type: file_path
+        description: "Local file path"
+      - name: remote_path
+        type: string
+        description: "Remote file path"
+
+  download:
+    description: "Download a file"
+    priority: 85
+    args:
+      - name: remote_path
+        type: string
+        description: "Remote file path"
+      - name: local_path
+        type: file_path
+        description: "Local file path"
+
+  ls:
+    description: "List directory contents"
+    priority: 90
+    args:
+      - name: path
+        type: string
+        description: "Directory path"
+        optional: true
+
+  cd:
+    description: "Change directory"
+    priority: 90
+    args:
+      - name: path
+        type: directory_path
+        description: "Directory path"
+
+  pwd:
+    description: "Print working directory"
+    priority: 85
+
+  # Process management
+  ps:
+    description: "List processes"
+    priority: 80
+
+  kill:
+    description: "Kill a process"
+    priority: 75
+    args:
+      - name: pid
+        type: process_id
+        description: "Process ID"
+
+  # Network
+  netstat:
+    description: "Show network connections"
+    priority: 70
+
+  portfwd:
+    description: "Port forwarding"
+    priority: 65
+    subcommands:
+      add:
+        description: "Add port forward"
+        args:
+          - name: local_port
+            type: number
+            description: "Local port"
+          - name: remote_address
+            type: string
+            description: "Remote address (host:port)"
+      list:
+        description: "List port forwards"
+      remove:
+        description: "Remove port forward"
+        args:
+          - name: local_port
+            type: number
+            description: "Local port to remove"
+
+  # System info
+  info:
+    description: "Show session information"
+    priority: 75
+  sysinfo:
+    description: "Show system information"
+    priority: 75
+  netinfo:
+    description: "Show network information"
+    priority: 70
+
+  # Execution
+  shell:
+    description: "Execute shell command"
+    priority: 92
+    args:
+      - name: command
+        type: string
+        description: "Command to execute"
+        rest: true # Consumes rest of line
+
+  exec:
+    description: "Execute command (no output)"
+    priority: 92
+    args:
+      - name: command
+        type: string
+        description: "Command to execute"
+        rest: true
+
+  # AI features
+  llama:
+    description: "Execute Llama AI prompt"
+    priority: 60
+    args:
+      - name: prompt
+        type: string
+        description: "AI prompt"
+        rest: true
+    flags:
+      - name: iterations
+        type: number
+        description: "Number of iterations"
+      - name: temperature
+        type: float
+        description: "Temperature setting"
+      - name: wait
+        type: bool
+        description: "Wait for completion"
+
+  memdb:
+    description: "Query MemDB"
+    priority: 60
+    args:
+      - name: query
+        type: string
+        description: "SQL-like query"
+        rest: true
+    completions:
+      - "SELECT"
+      - "FROM"
+      - "WHERE"
+      - "LIMIT"
+      - "ORDER BY"
+
+  # Configuration
+  log:
+    description: "Logging configuration"
+    priority: 65
+    subcommands:
+      status:
+        description: "Show log status"
+      level:
+        description: "Set log level"
+        args:
+          - name: level
+            type: enum
+            values: ["debug", "info", "warn", "error", "off"]
+            description: "Log level"
+      enable:
+        description: "Enable logging"
+      disable:
+        description: "Disable logging"
+
+  # Extension management
+  use:
+    description: "Load extension or beacon"
+    priority: 70
+    args:
+      - name: path
+        type: file_path
+        description: "Extension file path"
+    subcommands:
+      list:
+        description: "List loaded extensions"
+      execute:
+        description: "Execute extension"
+        args:
+          - name: name
+            type: extension_name
+            description: "Extension name"
+          - name: command
+            type: string
+            description: "Extension command"
+            optional: true
+          - name: args
+            type: string
+            description: "Extension arguments"
+            optional: true
+            rest: true
+      unload:
+        description: "Unload extension"
+        args:
+          - name: name
+            type: extension_name
+            description: "Extension name"
+
+  # Workflow
+  workflow:
+    description: "Workflow management"
+    priority: 65
+    subcommands:
+      list:
+        description: "List workflows"
+      run:
+        description: "Run a workflow"
+        args:
+          - name: name
+            type: workflow_name
+            description: "Workflow name"
+
+# Completion types
+completion_types:
+  session_id:
+    provider: session_list
+    description: "Active session IDs"
+
+  file_path:
+    provider: file_system
+    description: "File system paths"
+
+  directory_path:
+    provider: file_system
+    filter: directories_only
+    description: "Directory paths"
+
+  process_id:
+    provider: process_list
+    description: "Running process IDs"
+
+  extension_name:
+    provider: extension_list
+    description: "Loaded extension names"
+
+  workflow_name:
+    provider: workflow_list
+    description: "Available workflow names"
+
+  enum:
+    provider: static
+    description: "Predefined values"

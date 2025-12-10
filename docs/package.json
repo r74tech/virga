@@ -1,0 +1,27 @@
+{
+  "name": "virga-docs",
+  "version": "1.0.0",
+  "description": "Virga documentation",
+  "scripts": {
+    "docs:dev": "vitepress dev",
+    "docs:build": "bun run docs:clean && vitepress build",
+    "docs:preview": "vitepress preview",
+    "docs:clean": "rm -rf .vitepress/dist .vitepress/cache node_modules/.vitepress"
+  },
+  "devDependencies": {
+    "@braintree/sanitize-url": "^7.1.1",
+    "@nolebase/ui-asciinema": "^2.18.2",
+    "asciinema-player": "^3.12.1",
+    "cytoscape": "^3.33.1",
+    "cytoscape-cose-bilkent": "^4.1.0",
+    "dayjs": "^1.11.19",
+    "debug": "^4.4.3",
+    "flexsearch": "^0.8.212",
+    "medium-zoom": "^1.1.0",
+    "svg-toolbelt": "^0.7.0",
+    "vitepress": "^1.6.4",
+    "vitepress-plugin-llms": "^1.9.3",
+    "vitepress-plugin-mermaid": "^2.0.17",
+    "vitepress-plugin-search": "1.0.4-alpha.22"
+  }
+}

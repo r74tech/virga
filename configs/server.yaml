@@ -1,0 +1,37 @@
+database:
+    path: data/virga.db
+    type: sqlite3
+generator:
+    anti_av: true
+    anti_etw: true
+    initial_sleep: 60
+    jitter: 20
+    obfuscation: true
+    self_delete: false
+    user_agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36
+listeners:
+    - bind_address: 127.0.0.1
+      encryption:
+        key: change-this-key-in-production-environment
+        type: aes-256
+      name: default-http
+      port: 8080
+      type: http
+      uri_path: api/updates
+      use_ssl: false
+mcp:
+    enabled: true
+    remote_base_url: http://localhost:8444
+    remote_enabled: false
+    sse_base_path: /mcp
+    sse_enabled: true
+    sse_port: :8444
+    stdio_enabled: false
+    streamable_enabled: true
+    streamable_port: :50012
+server:
+    admin_port: 8443
+    host: 127.0.0.1
+    log_level: info
+    log_path: logs/server.log
+    session_timeout: 2m

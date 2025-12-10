@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "virga-stdio": {
+      "command": "virga-mcp-stdio"
+    },
+    "virga-sse": {
+      "command": "sh",
+      "args": ["-c", "curl -s -X GET http://localhost:8444/mcp/sse | sed -E 's/^data: (.+)$/\\1/' | sed '/^[[:space:]]*$/d'"],
+      "transport": "sse"
+    },
+    "virga-streamable": {
+      "url": "http://localhost:50012/mcp",
+      "transport": "streamablehttp"
+    }
+  }
+}

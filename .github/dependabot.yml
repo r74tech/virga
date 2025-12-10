@@ -1,0 +1,35 @@
+# To get started with Dependabot version updates, you'll need to specify which
+# package ecosystems to update and where the package manifests are located.
+# Please see the documentation for all configuration options:
+# https://docs.github.com/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
+
+version: 2
+updates:
+  # Go modules
+  - package-ecosystem: "gomod"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+
+  # Documentation (VitePress)
+  - package-ecosystem: "npm"
+    directory: "/docs"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    ignore:
+      # Ignore major version updates for stability
+      - dependency-name: "vitepress"
+        update-types: ["version-update:semver-major"]
+      # Temporarily ignore esbuild until compatibility is resolved
+      - dependency-name: "esbuild"
+        versions: [">=0.25.0"]
+
+  # Root package.json (MCP inspector scripts only)
+  # Note: This package.json only contains pnpm dlx scripts, not actual dependencies
+  # Commenting out to avoid errors with @modelcontextprotocol/inspector
+  # - package-ecosystem: "npm"
+  #   directory: "/"
+  #   schedule:
+  #     interval: "weekly"

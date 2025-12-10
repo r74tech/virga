@@ -1,0 +1,10 @@
+{
+  "name": "virga-mcp",
+  "version": "1.0.0",
+  "description": "MCP inspector environment for Virga",
+  "scripts": {
+    "mcp:inspect": "bunx @modelcontextprotocol/inspector --config ./config/mcp-inspector-config.json --server virga-stdio",
+    "mcp:inspect-sse": "bunx @modelcontextprotocol/inspector --config ./config/mcp-inspector-config.json --server virga-sse",
+    "mcp:inspect-streamable": "bunx @modelcontextprotocol/inspector --config ./config/mcp-inspector-config.json --server virga-streamable"
+  }
+}

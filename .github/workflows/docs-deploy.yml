@@ -1,0 +1,50 @@
+name: Deploy Documentation
+
+on:
+  push:
+    branches:
+      - develop
+    paths:
+      - "docs/**"
+      - ".github/workflows/docs-deploy.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: docs-deploy
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        working-directory: ./docs
+        run: bun install --frozen-lockfile
+
+      - name: Build documentation
+        working-directory: ./docs
+        env:
+          VITE_BASE: "/virga/"
+          VITE_GA_ID: ${{ secrets.VITE_GA_ID }}
+          VITE_COMMIT_HASH: ${{ github.sha }}
+        run: |
+          bun run docs:build
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./docs/.vitepress/dist
