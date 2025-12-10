@@ -1,0 +1,45 @@
+# Virga
+
+> C2 Framework powered by LLM models
+
+Autonomous post-exploitation capabilities powered by embedded LLM
+
+## Table of Contents
+
+### Guide
+
+#### Getting Started
+
+- [Introduction](/virga/guide/introduction.md)
+- [Installation](/virga/guide/installation.md)
+- [Quick Start](/virga/guide/quick-start.md)
+
+#### Core Concepts
+
+- [Listeners](/virga/guide/listeners.md)
+- [Session Management](/virga/guide/sessions.md)
+- [Virga Security Model](/virga/guide/security.md)
+
+### Usage
+
+#### Beacon Management
+
+- [Beacon Generation](/virga/usage/beacon-generation.md)
+- [Beacon Configuration](/virga/usage/beacon-configuration.md)
+
+#### AI & Automation
+
+- [AI Integration Features](/virga/usage/ai-features.md)
+- [MCP Integration](/virga/usage/mcp-integration.md)
+
+### Reference
+
+- [Server Configuration](/virga/reference/server-config-reference.md)
+- [Beacon Config File Reference](/virga/reference/beacon-config-reference.md)
+- [CLI Command Reference](/virga/reference/cli-command-reference.md)
+- [Virga API Reference](/virga/reference/api-reference.md)
+- [Troubleshooting Guide](/virga/reference/troubleshooting.md)
+
+### Other
+
+- [Virga Documentation](/virga/README.md)

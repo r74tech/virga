@@ -1,0 +1,10 @@
+{"version": 2, "width": 95, "height": 51, "timestamp": 1751738663, "env": {"SHELL": "/usr/bin/zsh", "TERM": "xterm-256color"}}
+[0.870954, "o", "\u001b[1Gvirga> "]
+[0.871376, "o", "sessions\u001b[0K\u001b[16G"]
+[1.30978, "o", " "]
+[1.37368, "o", "l"]
+[1.5395, "o", "i"]
+[1.80972, "o", "\u001b[1Gvirga> sessions list\u001b[0K\u001b[21G"]
+[2.01503, "o", "\r\n"]
+[2.02293, "o", "Active sessions:\r\nID                                   IP              Hostname             Last Seen\r\n--------------------------------------------------------------------------------\r\n932d73f8-d885-9d74-341c-609453461691 192.168.116.150:49708 DESKTOP-LTNGA90      2025-07-05 14:06:31\r\nvirga> "]
+[4.203163, "o", "\u001b[1Gvirga>"]

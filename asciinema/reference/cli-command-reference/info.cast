@@ -1,0 +1,8 @@
+{"version": 2, "width": 95, "height": 20, "timestamp": 1751738663, "env": {"SHELL": "/usr/bin/zsh", "TERM": "xterm-256color"}}
+[0.0, "o", "virga (932d73f8-d885-9d74-341c-609453461691)> "]
+[0.416726, "o", "i"]
+[0.551547, "o", "n"]
+[0.744582, "o", "f"]
+[0.756058, "o", "o"]
+[1.03742, "o", "\r\nSession Information:\r\n--------------------------------------------------------------------------------\r\nSession ID: 932d73f8-d885-9d74-341c-609453461691\r\nConnection: 192.168.116.150:49708\r\nFirst Seen: 2025-07-05 14:06:31\r\nLast Seen: 2025-07-05 14:06:31\r\nUptime: 4m 16s\r\n\r\n"]
+[1.037808, "o", "System Information:\r\n--------------------------------------------------------------------------------\r\nHostname: DESKTOP-LTNGA90\r\nUsername: DESKTOP-LTNGA90\\admin\r\nOS: windows\r\nArchitecture: amd64\r\nPID: 46444\r\n\r\nNetwork Information:\r\n--------------------------------------------------------------------------------\r\n\r\nBeacon Configuration:\r\n--------------------------------------------------------------------------------\r\nvirga (932d73f8-d885-9d74-341c-609453461691)> "]
