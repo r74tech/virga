@@ -2,6 +2,8 @@ github.com/ProjectZKM/Ziren/crates/go-runtime/zkvm_runtime v0.0.0-20251001021608
 github.com/ProjectZKM/Ziren/crates/go-runtime/zkvm_runtime v0.0.0-20251001021608-1fe7b43fc4d6/go.mod h1:ioLG6R+5bUSO1oeGSDxOV3FADARuMoytZCSX6MEMQkI=
 github.com/ThinkInAIXYZ/go-mcp v0.2.24 h1:NLMshD8Dgrc7Di0JDLM+KhrETmu1V9tIgrJsBtyqe10=
 github.com/ThinkInAIXYZ/go-mcp v0.2.24/go.mod h1:KnUWUymko7rmOgzvIjxwX0uB9oiJeLF/Q3W9cRt8fVg=
+github.com/ThinkInAIXYZ/go-mcp v0.2.25 h1:INhx6IR0cMHC49teKAQAkMdT9AUK4iWXWhoRM4sMo2o=
+github.com/ThinkInAIXYZ/go-mcp v0.2.25/go.mod h1:KnUWUymko7rmOgzvIjxwX0uB9oiJeLF/Q3W9cRt8fVg=
 github.com/bits-and-blooms/bitset v1.20.0 h1:2F+rfL86jE2d/bmw7OhqUg2Sj/1rURkBn3MdfoPyRVU=
 github.com/bits-and-blooms/bitset v1.20.0/go.mod h1:7hO7Gc7Pp1vODcmWvKMRA9BNmbv6a/7QIWpPxHddWR8=
 github.com/consensys/gnark-crypto v0.18.0 h1:vIye/FqI50VeAr0B3dx+YjeIvmc3LWz4yEfbWBpTUf0=
