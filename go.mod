@@ -4,7 +4,7 @@ go 1.25.0
 
 require (
 	github.com/Qitmeer/llama.go v0.0.0-20250101000000-000000000000
-	github.com/ThinkInAIXYZ/go-mcp v0.2.27
+	github.com/ThinkInAIXYZ/go-mcp v0.2.28
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/mux v1.8.1
 	github.com/hashicorp/go-memdb v1.3.5
