@@ -10,6 +10,8 @@ github.com/ThinkInAIXYZ/go-mcp v0.2.27 h1:jTmGqRvbL07E6n+ZxIjutgV3k36FdZqlXeip+d
 github.com/ThinkInAIXYZ/go-mcp v0.2.27/go.mod h1:KnUWUymko7rmOgzvIjxwX0uB9oiJeLF/Q3W9cRt8fVg=
 github.com/ThinkInAIXYZ/go-mcp v0.2.28 h1:kuIGISpUYZqW4YR6p67JDe47DB1rZWrgGniNOfKIRRk=
 github.com/ThinkInAIXYZ/go-mcp v0.2.28/go.mod h1:KnUWUymko7rmOgzvIjxwX0uB9oiJeLF/Q3W9cRt8fVg=
+github.com/ThinkInAIXYZ/go-mcp v0.2.29 h1:xnv4yyGUZoswHhHrOGtlXw5PafGZ/OQ4dv7DvavcgAI=
+github.com/ThinkInAIXYZ/go-mcp v0.2.29/go.mod h1:KnUWUymko7rmOgzvIjxwX0uB9oiJeLF/Q3W9cRt8fVg=
 github.com/bits-and-blooms/bitset v1.20.0 h1:2F+rfL86jE2d/bmw7OhqUg2Sj/1rURkBn3MdfoPyRVU=
 github.com/bits-and-blooms/bitset v1.20.0/go.mod h1:7hO7Gc7Pp1vODcmWvKMRA9BNmbv6a/7QIWpPxHddWR8=
 github.com/consensys/gnark-crypto v0.18.0 h1:vIye/FqI50VeAr0B3dx+YjeIvmc3LWz4yEfbWBpTUf0=
