@@ -10,7 +10,7 @@ require (
 	github.com/hashicorp/go-memdb v1.3.5
 	github.com/mattn/go-sqlite3 v1.14.49
 	github.com/peterh/liner v1.2.2
-	github.com/stretchr/testify v1.11.1
+	github.com/stretchr/testify v1.12.1
 	golang.org/x/sys v0.47.0
 	golang.org/x/term v0.45.0
 	gopkg.in/yaml.v3 v3.0.1
