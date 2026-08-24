@@ -8,7 +8,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/mux v1.8.1
 	github.com/hashicorp/go-memdb v1.3.5
-	github.com/mattn/go-sqlite3 v1.14.49
+	github.com/mattn/go-sqlite3 v1.14.50
 	github.com/peterh/liner v1.2.2
 	github.com/stretchr/testify v1.12.1
 	golang.org/x/sys v0.47.0
