@@ -1,6 +1,6 @@
 module github.com/r74tech/virga
 
-go 1.25.0
+go 1.26.0
 
 require (
 	github.com/Qitmeer/llama.go v0.0.0-20250101000000-000000000000
@@ -11,7 +11,7 @@ require (
 	github.com/mattn/go-sqlite3 v1.14.52
 	github.com/peterh/liner v1.2.2
 	github.com/stretchr/testify v1.12.1
-	golang.org/x/sys v0.47.0
+	golang.org/x/sys v0.48.0
 	golang.org/x/term v0.45.0
 	gopkg.in/yaml.v3 v3.0.1
 )
